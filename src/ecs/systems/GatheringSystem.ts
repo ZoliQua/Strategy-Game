@@ -1,5 +1,6 @@
 import type { With } from 'miniplex';
 import type { TileCoord } from '../../iso/coordinates';
+import type { PlayerManager } from '../../game/PlayerManager';
 import type { MapData } from '../../map/MapData';
 import { findPath } from '../../map/pathfinding';
 import type { ResourceType } from '../../types';
@@ -32,10 +33,16 @@ type Dropoff = With<
 export class GatheringSystem {
   private readonly world: EcsWorld;
   private readonly mapData: MapData;
+  private readonly players: PlayerManager | null;
 
-  constructor(world: EcsWorld, mapData: MapData) {
+  constructor(
+    world: EcsWorld,
+    mapData: MapData,
+    players: PlayerManager | null = null,
+  ) {
     this.world = world;
     this.mapData = mapData;
+    this.players = players;
   }
 
   update(deltaMs: number): void {
@@ -198,9 +205,13 @@ export class GatheringSystem {
   private deposit(v: Villager, type: ResourceType, amount: number): void {
     const floored = Math.floor(amount);
     if (floored <= 0) return;
-    const state = uiStore.getState();
-    state.setResources({ [type]: state.resources[type] + floored });
-    // Drop fractional remainder — avoids floating-point sneak-through.
+    const ownerId = v.owner.playerId;
+    const player = this.players?.get(ownerId);
+    if (player) player.resources[type] += floored;
+    if (ownerId === 1) {
+      const state = uiStore.getState();
+      state.setResources({ [type]: state.resources[type] + floored });
+    }
     v.gatherer.carrying -= floored;
   }
 

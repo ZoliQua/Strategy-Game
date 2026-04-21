@@ -110,7 +110,11 @@ export class GameScene extends Phaser.Scene {
     this.selectionSystem = new SelectionSystem(this, this.world);
     this.pathfindingSystem = new PathfindingSystem(this.world, this.mapData);
     this.movementSystem = new MovementSystem(this.world);
-    this.gatheringSystem = new GatheringSystem(this.world, this.mapData);
+    this.gatheringSystem = new GatheringSystem(
+      this.world,
+      this.mapData,
+      this.players,
+    );
     this.constructionSystem = new ConstructionSystem(this.world, this.mapData);
     this.trainingSystem = new TrainingSystem(this.world, this.mapData);
     this.populationSystem = new PopulationSystem(this.world, 1);
