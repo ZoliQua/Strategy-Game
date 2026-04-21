@@ -46,7 +46,7 @@ export class ConstructionSystem {
 
     for (const b of builders) {
       const site = sites.get(b.buildCommand.targetId);
-      if (!site) {
+      if (!site || !site.underConstruction) {
         this.world.removeComponent(b as Entity, 'buildCommand');
         continue;
       }

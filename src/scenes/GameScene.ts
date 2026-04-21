@@ -23,7 +23,7 @@ import { pickTile } from '../iso/picking';
 import { hu } from '../i18n/hu';
 import { generateMap } from '../map/generator';
 import { TileMap } from '../map/TileMap';
-import { uiStore } from '../ui/store';
+import { resetUiStore, uiStore } from '../ui/store';
 import { CameraController } from './systems/CameraController';
 
 export class GameScene extends Phaser.Scene {
@@ -50,6 +50,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor('#0d1016');
+    resetUiStore();
 
     const generated = generateMap({
       template: 'meadow',

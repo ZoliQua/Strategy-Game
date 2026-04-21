@@ -122,16 +122,42 @@ export class SelectionSystem {
       uiStore.getState().setSelectedEntity(null);
       return;
     }
+    this.drawIndicator(selected);
+    uiStore.getState().setSelectedEntity(toSelectedInfo(selected));
+  }
+
+  private drawIndicator(selected: SelectableWithPos): void {
     if (!this.indicator) {
       this.indicator = this.scene.add.graphics();
-      this.indicator.lineStyle(2, 0x8bc34a, 1);
-      this.indicator.strokeEllipse(0, 0, 36, 18);
     }
-    const { sx, sy } = tileToScreen(selected.position);
-    this.indicator.setPosition(sx, sy);
-    this.indicator.setDepth(tileDepth(selected.position) - 0.1);
+    this.indicator.clear();
+    this.indicator.lineStyle(2, 0x8bc34a, 1);
+    const e = selected as Entity;
+    if (e.building) {
+      const w = e.building.footprint.width;
+      const h = e.building.footprint.height;
+      const centerTile = {
+        tx: selected.position.tx + (w - 1) / 2,
+        ty: selected.position.ty + (h - 1) / 2,
+      };
+      const { sx, sy } = tileToScreen(centerTile);
+      const halfW = ((w + h) * 32) / 2;
+      const halfH = ((w + h) * 16) / 2;
+      this.indicator.beginPath();
+      this.indicator.moveTo(sx, sy - halfH);
+      this.indicator.lineTo(sx + halfW, sy);
+      this.indicator.lineTo(sx, sy + halfH);
+      this.indicator.lineTo(sx - halfW, sy);
+      this.indicator.closePath();
+      this.indicator.strokePath();
+      this.indicator.setDepth(
+        selected.position.tx + w - 1 + (selected.position.ty + h - 1) - 0.1,
+      );
+    } else {
+      const { sx, sy } = tileToScreen(selected.position);
+      this.indicator.strokeEllipse(sx, sy, 36, 18);
+      this.indicator.setDepth(tileDepth(selected.position) - 0.1);
+    }
     this.indicator.setVisible(true);
-
-    uiStore.getState().setSelectedEntity(toSelectedInfo(selected));
   }
 }

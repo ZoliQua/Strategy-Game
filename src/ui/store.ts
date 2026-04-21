@@ -73,6 +73,16 @@ export function createUiStore(): StoreApi<UiStore> {
   }));
 }
 
+export function resetUiStore(store: StoreApi<UiStore> = uiStore): void {
+  store.setState({
+    resources: { ...INITIAL.resources },
+    population: { ...INITIAL.population },
+    currentAge: INITIAL.currentAge,
+    selectedEntity: null,
+    placementBuilding: null,
+  });
+}
+
 /**
  * Default singleton store used by GameScene and HUDScene. Pinned on
  * globalThis so Vite HMR re-evaluations share a single instance
