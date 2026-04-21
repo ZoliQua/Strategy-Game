@@ -2,10 +2,21 @@ import Phaser from 'phaser';
 import type { With } from 'miniplex';
 import { tileToScreen } from '../../iso/coordinates';
 import { tileDepth } from '../../iso/depth';
+import { uiStore, type SelectedEntityInfo } from '../../ui/store';
 import type { Entity } from '../components';
 import type { EcsWorld } from '../world';
 
 type SelectableWithPos = With<Entity, 'position' | 'selectable'>;
+
+function toSelectedInfo(entity: SelectableWithPos): SelectedEntityInfo | null {
+  if (!entity.unit || !entity.health || entity.id === undefined) return null;
+  return {
+    id: entity.id,
+    unitType: entity.unit.unitType,
+    hp: { current: entity.health.current, max: entity.health.max },
+    tile: { tx: entity.position.tx, ty: entity.position.ty },
+  };
+}
 
 /**
  * Manages a single-entity selection for the human player (M0 scope —
@@ -55,6 +66,7 @@ export class SelectionSystem {
     const selected = this.getSelected();
     if (!selected) {
       this.indicator?.setVisible(false);
+      uiStore.getState().setSelectedEntity(null);
       return;
     }
     if (!this.indicator) {
@@ -66,5 +78,7 @@ export class SelectionSystem {
     this.indicator.setPosition(sx, sy);
     this.indicator.setDepth(tileDepth(selected.position) - 0.1);
     this.indicator.setVisible(true);
+
+    uiStore.getState().setSelectedEntity(toSelectedInfo(selected));
   }
 }

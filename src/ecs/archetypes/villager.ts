@@ -14,6 +14,7 @@ export function createVillager(
     position: { tx: options.tile.tx, ty: options.tile.ty },
     renderable: { textureKey: 'villager_placeholder' },
     unit: { unitType: 'villager' },
+    health: { current: 25, max: 25 },
     selectable: { selected: false },
   });
   world.add(entity);

@@ -23,6 +23,7 @@ export interface Entity {
   };
   sprite?: Phaser.GameObjects.Sprite;
   unit?: UnitTag;
+  health?: { current: number; max: number };
   selectable?: { selected: boolean };
   moveIntent?: { target: TileCoord };
 }

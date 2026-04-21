@@ -55,6 +55,11 @@ export class GameScene extends Phaser.Scene {
 
     createVillager(this.world, { tile: { tx: 10, ty: 10 } });
     createVillager(this.world, { tile: { tx: 12, ty: 14 } });
+    createVillager(this.world, { tile: { tx: 11, ty: 12 } });
+
+    if (!this.scene.isActive('HUDScene')) {
+      this.scene.launch('HUDScene');
+    }
 
     this.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
 
