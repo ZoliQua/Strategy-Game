@@ -1,0 +1,82 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { MapData } from '../../map/MapData';
+import { TERRAIN } from '../../map/TerrainTypes';
+import { uiStore } from '../../ui/store';
+import { createBuilding } from '../archetypes/building';
+import { createResourceNode } from '../archetypes/resource';
+import { createVillager } from '../archetypes/villager';
+import { createEcsWorld } from '../world';
+import { GatheringSystem } from './GatheringSystem';
+
+function setup() {
+  // Small map: TC at (0,0) 3x3, tree at (5,5), villager at (4,5).
+  const map = new MapData(16, 16, TERRAIN.grass);
+  map.setTile(5, 5, TERRAIN.forest);
+  const world = createEcsWorld();
+  createBuilding(world, {
+    type: 'town_center',
+    origin: { tx: 0, ty: 0 },
+    playerId: 1,
+    mapData: map,
+  });
+  const tree = createResourceNode(world, {
+    tile: { tx: 5, ty: 5 },
+    type: 'wood',
+    amount: 5,
+  });
+  const villager = createVillager(world, { tile: { tx: 4, ty: 5 } });
+  const system = new GatheringSystem(world, map);
+  return { map, world, tree, villager, system };
+}
+
+describe('GatheringSystem', () => {
+  beforeEach(() => {
+    uiStore.setState({
+      resources: { food: 0, wood: 0, gold: 0 },
+    });
+  });
+
+  it('gathers when villager is adjacent to a tree', () => {
+    const { system, villager, tree } = setup();
+    villager.gatherIntent = { nodeId: tree.id! };
+    // Trigger the intent; villager already adjacent so we expect gather.
+    system.update(1000); // 1s * 0.6 rate = 0.6 wood
+    expect(villager.gatherer!.carrying).toBeCloseTo(0.6, 5);
+    expect(villager.gatherer!.carryingType).toBe('wood');
+    expect(tree.resourceNode!.amount).toBeCloseTo(5 - 0.6, 5);
+  });
+
+  it('fills up and heads to the dropoff', () => {
+    const { system, villager, tree } = setup();
+    villager.gatherer!.capacity = 2;
+    villager.gatherIntent = { nodeId: tree.id! };
+
+    // Gather until full (capacity=2 at rate 0.6 → ~3.4s).
+    system.update(4000);
+    expect(villager.gatherer!.carrying).toBeCloseTo(2, 5);
+    // Villager should have queued a path toward the town center.
+    expect(villager.movable!.path.length).toBeGreaterThan(0);
+  });
+
+  it('depletes the node and reverts terrain', () => {
+    const { system, villager, tree, map } = setup();
+    tree.resourceNode!.amount = 0.5;
+    villager.gatherer!.capacity = 20;
+    villager.gatherIntent = { nodeId: tree.id! };
+    system.update(2000);
+    expect(tree.resourceNode!.amount).toBeCloseTo(0, 5);
+    expect(map.getTile(5, 5)).toBe(TERRAIN.grass);
+  });
+
+  it('drops off when adjacent to the town center', () => {
+    const { system, villager } = setup();
+    villager.position = { tx: 3, ty: 1 };
+    villager.gatherer!.capacity = 5;
+    villager.gatherer!.carrying = 5;
+    villager.gatherer!.carryingType = 'wood';
+    system.update(50);
+    expect(uiStore.getState().resources.wood).toBe(5);
+    expect(villager.gatherer!.carrying).toBe(0);
+    expect(villager.gatherer!.carryingType).toBeNull();
+  });
+});

@@ -6,6 +6,7 @@ import {
   TERRAIN_RESOURCE,
 } from '../ecs/archetypes/resource';
 import { createVillager } from '../ecs/archetypes/villager';
+import { GatheringSystem } from '../ecs/systems/GatheringSystem';
 import { MovementSystem } from '../ecs/systems/MovementSystem';
 import { PathfindingSystem } from '../ecs/systems/PathfindingSystem';
 import { RenderSystem } from '../ecs/systems/RenderSystem';
@@ -27,6 +28,7 @@ export class GameScene extends Phaser.Scene {
   private selectionSystem!: SelectionSystem;
   private pathfindingSystem!: PathfindingSystem;
   private movementSystem!: MovementSystem;
+  private gatheringSystem!: GatheringSystem;
   private mapData!: import('../map/MapData').MapData;
   private hoverTile: TileCoord | null = null;
   private playerStart: TileCoord = { tx: 10, ty: 10 };
@@ -68,6 +70,14 @@ export class GameScene extends Phaser.Scene {
     this.selectionSystem = new SelectionSystem(this, this.world);
     this.pathfindingSystem = new PathfindingSystem(this.world, this.mapData);
     this.movementSystem = new MovementSystem(this.world);
+    this.gatheringSystem = new GatheringSystem(this.world, this.mapData);
+
+    const resourceNodes = this.world.with('position', 'resourceNode');
+    resourceNodes.onEntityRemoved.subscribe((entity) => {
+      if (entity.position) {
+        this.tileMap.refreshTile(entity.position.tx, entity.position.ty);
+      }
+    });
 
     this.spawnResourceNodes();
 
@@ -154,15 +164,30 @@ export class GameScene extends Phaser.Scene {
       else this.selectionSystem.clearSelection();
     } else if (pointer.rightButtonDown() && tile) {
       const selected = this.selectionSystem.getSelected();
-      if (selected) {
+      if (!selected) return;
+      const node = this.findResourceNodeAt(tile.tx, tile.ty);
+      if (node && selected.gatherer) {
+        this.world.addComponent(selected, 'gatherIntent', {
+          nodeId: node.id ?? 0,
+        });
+      } else {
         this.world.addComponent(selected, 'moveIntent', { target: tile });
       }
     }
   }
 
+  private findResourceNodeAt(tx: number, ty: number): import('../ecs/components').Entity | null {
+    const nodes = this.world.with('position', 'resourceNode');
+    for (const n of nodes) {
+      if (n.position.tx === tx && n.position.ty === ty) return n;
+    }
+    return null;
+  }
+
   private onUpdate(_time: number, delta: number): void {
     this.cameraController.update(delta);
     this.pathfindingSystem.update();
+    this.gatheringSystem.update(delta);
     this.movementSystem.update(delta);
     this.selectionSystem.update();
     this.renderSystem.update();

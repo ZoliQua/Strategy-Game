@@ -49,9 +49,9 @@ export interface Entity {
     /** Per-second rate while standing next to a resource node. */
     gatherRate: number;
     /** Which resource node the villager is assigned to (entity id). */
-    targetNodeId?: number;
+    targetNodeId: number | undefined;
     /** Last-known drop-off building id (town center or camp). */
-    dropoffId?: number;
+    dropoffId: number | undefined;
   };
   gatherIntent?: { nodeId: number };
   resourceDropoff?: {

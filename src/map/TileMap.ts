@@ -18,6 +18,7 @@ export class TileMap {
   private readonly scene: Phaser.Scene;
   private readonly layer: Phaser.GameObjects.Layer;
   private readonly mapData: MapData;
+  private readonly tileSprites: Phaser.GameObjects.Image[] = [];
   private highlight: Phaser.GameObjects.Graphics | null = null;
   private selection: Phaser.GameObjects.Graphics | null = null;
 
@@ -38,7 +39,17 @@ export class TileMap {
         .setOrigin(0.5, 0.5)
         .setDepth(tileDepth({ tx, ty }));
       this.layer.add(sprite);
+      this.tileSprites[ty * this.width + tx] = sprite;
     });
+  }
+
+  /** Re-reads terrain for a single tile from MapData and updates the sprite. */
+  refreshTile(tx: number, ty: number): void {
+    const idx = ty * this.width + tx;
+    const sprite = this.tileSprites[idx];
+    if (!sprite) return;
+    const terrain = this.mapData.getTile(tx, ty);
+    sprite.setTexture(TERRAIN_TEXTURE_KEYS[terrain]);
   }
 
   setHoverTile(tile: TileCoord | null): void {
