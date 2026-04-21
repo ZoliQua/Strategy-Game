@@ -1,0 +1,32 @@
+import type { AgeId, CivId, Resources } from '../types';
+
+export interface Player {
+  id: number;
+  isHuman: boolean;
+  civ: CivId;
+  color: number;
+  resources: Resources;
+  age: AgeId;
+  defeated: boolean;
+}
+
+export const PLAYER_COLORS: readonly number[] = [
+  0x4a8ad0, // 1 — kék (human default)
+  0xd04a4a, // 2 — vörös
+  0x4ad068, // 3 — zöld
+  0xd0a84a, // 4 — sárga
+  0xa04ad0, // 5 — lila
+  0x4ad0c0, // 6 — türkíz
+];
+
+export function createPlayer(partial: Partial<Player> & { id: number }): Player {
+  return {
+    isHuman: false,
+    civ: 'hungarian',
+    color: PLAYER_COLORS[(partial.id - 1) % PLAYER_COLORS.length] ?? 0xffffff,
+    resources: { food: 200, wood: 200, gold: 100 },
+    age: 1,
+    defeated: false,
+    ...partial,
+  };
+}

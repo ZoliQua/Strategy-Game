@@ -1,5 +1,9 @@
 import Phaser from 'phaser';
 import { DEFAULT_MAP_SIZE } from '../config/constants';
+import {
+  createDefaultPlayers,
+  PlayerManager,
+} from '../game/PlayerManager';
 import { BUILDING_SPECS, createBuilding } from '../ecs/archetypes/building';
 import {
   createResourceNode,
@@ -38,11 +42,13 @@ export class GameScene extends Phaser.Scene {
   private constructionSystem!: ConstructionSystem;
   private trainingSystem!: TrainingSystem;
   private populationSystem!: PopulationSystem;
+  private players!: PlayerManager;
   private commandUnsubscribe: (() => void) | null = null;
   private buildGhost: Phaser.GameObjects.Image | null = null;
   private mapData!: import('../map/MapData').MapData;
   private hoverTile: TileCoord | null = null;
   private playerStart: TileCoord = { tx: 10, ty: 10 };
+  private aiStart: TileCoord = { tx: 50, ty: 50 };
 
   constructor() {
     super({ key: 'GameScene' });
@@ -52,16 +58,18 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0d1016');
     resetUiStore();
 
+    this.players = createDefaultPlayers();
     const generated = generateMap({
       template: 'meadow',
       width: DEFAULT_MAP_SIZE,
       height: DEFAULT_MAP_SIZE,
       seed: 42,
-      playerCount: 4,
+      playerCount: this.players.all().length,
     });
     this.mapData = generated.map;
     this.tileMap = new TileMap(this, this.mapData);
     this.playerStart = generated.playerStarts[0] ?? { tx: 10, ty: 10 };
+    this.aiStart = generated.playerStarts[1] ?? { tx: 50, ty: 50 };
 
     const bounds = this.tileMap.getWorldBounds();
     const padding = 200;
@@ -112,26 +120,22 @@ export class GameScene extends Phaser.Scene {
 
     this.spawnResourceNodes();
 
-    const tcOrigin = {
-      tx: this.playerStart.tx - 1,
-      ty: this.playerStart.ty - 1,
-    };
-    createBuilding(this.world, {
-      type: 'town_center',
-      origin: tcOrigin,
-      playerId: 1,
-      mapData: this.mapData,
-    });
-    // Villagers spawn south of the town center so they don't overlap.
-    createVillager(this.world, {
-      tile: { tx: this.playerStart.tx, ty: this.playerStart.ty + 3 },
-    });
-    createVillager(this.world, {
-      tile: { tx: this.playerStart.tx + 1, ty: this.playerStart.ty + 3 },
-    });
-    createVillager(this.world, {
-      tile: { tx: this.playerStart.tx - 1, ty: this.playerStart.ty + 3 },
-    });
+    for (const player of this.players.all()) {
+      const start = player.isHuman ? this.playerStart : this.aiStart;
+      const tcOrigin = { tx: start.tx - 1, ty: start.ty - 1 };
+      createBuilding(this.world, {
+        type: 'town_center',
+        origin: tcOrigin,
+        playerId: player.id,
+        mapData: this.mapData,
+      });
+      for (const dx of [-1, 0, 1]) {
+        createVillager(this.world, {
+          tile: { tx: start.tx + dx, ty: start.ty + 3 },
+          playerId: player.id,
+        });
+      }
+    }
 
     if (!this.scene.isActive('HUDScene')) {
       this.scene.launch('HUDScene');
