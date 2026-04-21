@@ -165,6 +165,15 @@ export class GameScene extends Phaser.Scene {
     if (!this.scene.isActive('HUDScene')) {
       this.scene.launch('HUDScene');
     }
+    // Wire the minimap once the HUD scene has finished its own create().
+    this.time.delayedCall(50, () => {
+      const hud = this.scene.get('HUDScene') as import('./HUDScene').HUDScene;
+      hud.setupMinimap(this.world, this.mapData, this.cameras.main, (tx, ty) => {
+        const sx = (tx - ty) * 32;
+        const sy = (tx + ty) * 16;
+        this.cameras.main.centerOn(sx, sy);
+      });
+    });
 
     this.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
 

@@ -4,7 +4,10 @@ import { UNIT_SPECS } from '../ecs/archetypes/unit';
 import { hu } from '../i18n/hu';
 import type { AgeId, BuildingType, ResourceType, UnitType } from '../types';
 import { dispatchCommand } from '../ui/events';
+import { Minimap } from '../ui/Minimap';
 import { uiStore, type SelectedEntityInfo, type UiStore } from '../ui/store';
+import type { MapData } from '../map/MapData';
+import type { EcsWorld } from '../ecs/world';
 
 const BUILDABLE_BY_VILLAGER: readonly BuildingType[] = [
   'house',
@@ -32,6 +35,7 @@ export class HUDScene extends Phaser.Scene {
   private trainButtons: Phaser.GameObjects.Container[] = [];
   private queueText!: Phaser.GameObjects.Text;
   private placementHint!: Phaser.GameObjects.Text;
+  private minimap: Minimap | null = null;
   private unsubscribe: (() => void) | null = null;
 
   constructor() {
@@ -48,6 +52,21 @@ export class HUDScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubscribe?.();
       this.unsubscribe = null;
+      this.minimap?.destroy();
+      this.minimap = null;
+    });
+  }
+
+  setupMinimap(
+    world: EcsWorld,
+    mapData: MapData,
+    gameCamera: Phaser.Cameras.Scene2D.Camera,
+    onJumpTo: (tx: number, ty: number) => void,
+  ): void {
+    this.minimap?.destroy();
+    this.minimap = new Minimap(this, world, mapData, gameCamera, onJumpTo);
+    this.events.on(Phaser.Scenes.Events.UPDATE, (_t: number, d: number) => {
+      this.minimap?.update(d);
     });
   }
 
