@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { DEFAULT_MAP_SIZE } from '../config/constants';
 import { createVillager } from '../ecs/archetypes/villager';
+import { MoveIntentSystem } from '../ecs/systems/MoveIntentSystem';
 import { RenderSystem } from '../ecs/systems/RenderSystem';
+import { SelectionSystem } from '../ecs/systems/SelectionSystem';
 import { createEcsWorld, type EcsWorld } from '../ecs/world';
 import type { TileCoord } from '../iso/coordinates';
 import { tileEquals } from '../iso/coordinates';
@@ -15,6 +17,8 @@ export class GameScene extends Phaser.Scene {
   private cameraController!: CameraController;
   private world!: EcsWorld;
   private renderSystem!: RenderSystem;
+  private selectionSystem!: SelectionSystem;
+  private moveIntentSystem!: MoveIntentSystem;
   private hoverTile: TileCoord | null = null;
 
   constructor() {
@@ -46,11 +50,15 @@ export class GameScene extends Phaser.Scene {
 
     this.world = createEcsWorld();
     this.renderSystem = new RenderSystem(this, this.world);
+    this.selectionSystem = new SelectionSystem(this, this.world);
+    this.moveIntentSystem = new MoveIntentSystem(this.world);
 
     createVillager(this.world, { tile: { tx: 10, ty: 10 } });
+    createVillager(this.world, { tile: { tx: 12, ty: 14 } });
 
     this.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
 
+    this.input.mouse?.disableContextMenu();
     this.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
 
@@ -77,7 +85,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    if (!pointer.leftButtonDown()) return;
     const tile = pickTile(
       pointer.x,
       pointer.y,
@@ -85,11 +92,20 @@ export class GameScene extends Phaser.Scene {
       this.tileMap.width,
       this.tileMap.height,
     );
-    this.tileMap.setSelectedTile(tile);
+    if (pointer.leftButtonDown()) {
+      this.tileMap.setSelectedTile(tile);
+      if (tile) this.selectionSystem.selectAtTile(tile.tx, tile.ty);
+      else this.selectionSystem.clearSelection();
+    } else if (pointer.rightButtonDown() && tile) {
+      const selected = this.selectionSystem.getSelected();
+      if (selected) selected.moveIntent = { target: tile };
+    }
   }
 
   private onUpdate(_time: number, delta: number): void {
     this.cameraController.update(delta);
+    this.moveIntentSystem.update();
+    this.selectionSystem.update();
     this.renderSystem.update();
   }
 
