@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import type { TileCoord } from '../iso/coordinates';
+import type { Direction } from '../types';
 
 /**
  * All ECS components. Miniplex entities are plain objects with any
@@ -26,4 +27,13 @@ export interface Entity {
   health?: { current: number; max: number };
   selectable?: { selected: boolean };
   moveIntent?: { target: TileCoord };
+  movable?: {
+    /** Tiles per second. */
+    speed: number;
+    /** Remaining path (never includes the current `position`). */
+    path: TileCoord[];
+    /** 0..1 progress from current tile toward `path[0]`. */
+    progress: number;
+    facing: Direction;
+  };
 }

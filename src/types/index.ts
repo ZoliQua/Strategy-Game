@@ -56,3 +56,34 @@ export interface Population {
   current: number;
   cap: number;
 }
+
+export type Direction =
+  | 'N'
+  | 'NE'
+  | 'E'
+  | 'SE'
+  | 'S'
+  | 'SW'
+  | 'W'
+  | 'NW';
+
+export const DIRECTIONS: readonly Direction[] = [
+  'N',
+  'NE',
+  'E',
+  'SE',
+  'S',
+  'SW',
+  'W',
+  'NW',
+] as const;
+
+export function directionFromDelta(dx: number, dy: number): Direction {
+  if (dx === 0 && dy === 0) return 'S';
+  // Iso convention (CLAUDE.md 3): +tx goes E on screen, +ty goes S on screen.
+  // We collapse (dx, dy) to one of 8 headings.
+  const angle = Math.atan2(dy, dx);
+  const octant = Math.round((angle * 4) / Math.PI + 8) % 8;
+  const lookup: Direction[] = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
+  return lookup[octant] ?? 'S';
+}

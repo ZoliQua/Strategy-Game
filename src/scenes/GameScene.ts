@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { DEFAULT_MAP_SIZE } from '../config/constants';
 import { createVillager } from '../ecs/archetypes/villager';
-import { MoveIntentSystem } from '../ecs/systems/MoveIntentSystem';
+import { MovementSystem } from '../ecs/systems/MovementSystem';
+import { PathfindingSystem } from '../ecs/systems/PathfindingSystem';
 import { RenderSystem } from '../ecs/systems/RenderSystem';
 import { SelectionSystem } from '../ecs/systems/SelectionSystem';
 import { createEcsWorld, type EcsWorld } from '../ecs/world';
@@ -19,7 +20,9 @@ export class GameScene extends Phaser.Scene {
   private world!: EcsWorld;
   private renderSystem!: RenderSystem;
   private selectionSystem!: SelectionSystem;
-  private moveIntentSystem!: MoveIntentSystem;
+  private pathfindingSystem!: PathfindingSystem;
+  private movementSystem!: MovementSystem;
+  private mapData!: import('../map/MapData').MapData;
   private hoverTile: TileCoord | null = null;
   private playerStart: TileCoord = { tx: 10, ty: 10 };
 
@@ -37,7 +40,8 @@ export class GameScene extends Phaser.Scene {
       seed: 42,
       playerCount: 4,
     });
-    this.tileMap = new TileMap(this, generated.map);
+    this.mapData = generated.map;
+    this.tileMap = new TileMap(this, this.mapData);
     this.playerStart = generated.playerStarts[0] ?? { tx: 10, ty: 10 };
 
     const bounds = this.tileMap.getWorldBounds();
@@ -57,7 +61,8 @@ export class GameScene extends Phaser.Scene {
     this.world = createEcsWorld();
     this.renderSystem = new RenderSystem(this, this.world);
     this.selectionSystem = new SelectionSystem(this, this.world);
-    this.moveIntentSystem = new MoveIntentSystem(this.world);
+    this.pathfindingSystem = new PathfindingSystem(this.world, this.mapData);
+    this.movementSystem = new MovementSystem(this.world);
 
     createVillager(this.world, { tile: this.playerStart });
     createVillager(this.world, {
@@ -121,13 +126,16 @@ export class GameScene extends Phaser.Scene {
       else this.selectionSystem.clearSelection();
     } else if (pointer.rightButtonDown() && tile) {
       const selected = this.selectionSystem.getSelected();
-      if (selected) selected.moveIntent = { target: tile };
+      if (selected) {
+        this.world.addComponent(selected, 'moveIntent', { target: tile });
+      }
     }
   }
 
   private onUpdate(_time: number, delta: number): void {
     this.cameraController.update(delta);
-    this.moveIntentSystem.update();
+    this.pathfindingSystem.update();
+    this.movementSystem.update(delta);
     this.selectionSystem.update();
     this.renderSystem.update();
   }

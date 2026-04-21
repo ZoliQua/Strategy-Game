@@ -35,9 +35,9 @@ export class RenderSystem {
   update(): void {
     for (const entity of this.renderable) {
       const sprite = entity.sprite ?? this.ensureSprite(entity);
-      const { sx, sy } = tileToScreen(entity.position);
+      const { sx, sy } = renderScreenPos(entity);
       sprite.setPosition(sx, sy);
-      sprite.setDepth(tileDepth(entity.position));
+      sprite.setDepth(renderDepth(entity));
     }
   }
 
@@ -47,4 +47,31 @@ export class RenderSystem {
     entity.sprite = sprite;
     return sprite;
   }
+}
+
+function renderScreenPos(entity: Renderable): { sx: number; sy: number } {
+  const current = entity.position;
+  const mv = entity.movable;
+  if (!mv || mv.path.length === 0 || mv.progress === 0) {
+    return tileToScreen(current);
+  }
+  const next = mv.path[0]!;
+  const t = Math.min(Math.max(mv.progress, 0), 1);
+  const from = tileToScreen(current);
+  const to = tileToScreen(next);
+  return {
+    sx: from.sx + (to.sx - from.sx) * t,
+    sy: from.sy + (to.sy - from.sy) * t,
+  };
+}
+
+function renderDepth(entity: Renderable): number {
+  const mv = entity.movable;
+  if (!mv || mv.path.length === 0) return tileDepth(entity.position);
+  const next = mv.path[0]!;
+  const t = Math.min(Math.max(mv.progress, 0), 1);
+  return (
+    tileDepth(entity.position) +
+    (tileDepth(next) - tileDepth(entity.position)) * t
+  );
 }

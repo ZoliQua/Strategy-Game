@@ -16,6 +16,7 @@ export function createVillager(
     unit: { unitType: 'villager' },
     health: { current: 25, max: 25 },
     selectable: { selected: false },
+    movable: { speed: 2.5, path: [], progress: 0, facing: 'S' },
   });
   world.add(entity);
   return entity;
