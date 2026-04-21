@@ -80,14 +80,14 @@ describe('pickTile pipeline', () => {
     expect(tile?.ty).toBeGreaterThanOrEqual(0);
   });
 
-  it('floors nearby points into the expected tile', () => {
+  it('diamond-accurate pick returns the tile whose rhombus contains the point', () => {
     const cam = { scrollX: 0, scrollY: 0, zoom: 1 };
-    // Points within the same floor-bucket of tile (1,0). Diamond-exact
-    // picking is not a requirement at M0 — flooring is sufficient.
+    // All samples fall inside the diamond of tile (1,0) centre=(32,16).
     const samples = [
-      { sx: 33, sy: 17 },
-      { sx: 40, sy: 24 },
-      { sx: 36, sy: 20 },
+      { sx: 32, sy: 16 }, // centre
+      { sx: 44, sy: 20 },
+      { sx: 36, sy: 22 },
+      { sx: 32, sy: 30 },
     ];
     for (const c of samples) {
       expect(pick(c.sx, c.sy, cam, 64, 64)).toEqual({ tx: 1, ty: 0 });

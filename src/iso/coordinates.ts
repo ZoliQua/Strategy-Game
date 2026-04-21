@@ -27,8 +27,18 @@ export function screenToTile(s: ScreenCoord): TileCoord {
 }
 
 export function screenToTileFloor(s: ScreenCoord): TileCoord {
+  // Diamond-accurate picking: the nearest tile *center* (in tile space)
+  // is the one whose diamond contains the point on an iso grid. Flooring
+  // the fractional tile coords picks the wrong triangle along the four
+  // diagonal boundaries, so we round to nearest instead. This matches
+  // the visual intuition "click ON the berry → berry tile", not the
+  // grass tile that happens to share a vertex.
   const t = screenToTile(s);
-  return { tx: Math.floor(t.tx), ty: Math.floor(t.ty) };
+  // Math.round can produce -0 for inputs in (-0.5, 0); normalise so
+  // comparisons with {tx:0} behave as expected.
+  const tx = Math.round(t.tx);
+  const ty = Math.round(t.ty);
+  return { tx: tx === 0 ? 0 : tx, ty: ty === 0 ? 0 : ty };
 }
 
 export function tileEquals(a: TileCoord, b: TileCoord): boolean {

@@ -17,6 +17,12 @@ const BUILDABLE_BY_VILLAGER: readonly BuildingType[] = [
   'barracks',
 ];
 
+const RESOURCE_LABEL: Record<'food' | 'wood' | 'gold', string> = {
+  food: 'Bogyós bokor',
+  wood: 'Fa',
+  gold: 'Arany-lelőhely',
+};
+
 const PANEL_COLOR = 0x141922;
 const PANEL_STROKE = 0x2a3140;
 const LABEL_COLOR = '#c9c2a6';
@@ -376,6 +382,14 @@ export class HUDScene extends Phaser.Scene {
     if (!selected) {
       this.selectionName.setText(hu.hud.noSelection);
       this.selectionHp.setText('');
+      return;
+    }
+    if (selected.kind === 'resource') {
+      this.selectionName.setText(RESOURCE_LABEL[selected.resourceType]);
+      const at = `(${selected.tile.tx}, ${selected.tile.ty})`;
+      this.selectionHp.setText(
+        `${hu.resources[selected.resourceType]}: ${selected.amount} / ${selected.maxAmount}  ·  ${at}`,
+      );
       return;
     }
     const label =

@@ -36,5 +36,7 @@ export class FogOfWarSystem {
         }
       }
     }
+    // Signal renderers that the fog state changed so they repaint.
+    this.fog.revision++;
   }
 }

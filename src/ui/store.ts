@@ -32,7 +32,19 @@ export interface SelectedBuildingInfo {
   queue?: readonly TrainingEntryInfo[];
 }
 
-export type SelectedEntityInfo = SelectedUnitInfo | SelectedBuildingInfo;
+export interface SelectedResourceInfo {
+  kind: 'resource';
+  id: number;
+  resourceType: 'food' | 'wood' | 'gold';
+  amount: number;
+  maxAmount: number;
+  tile: { tx: number; ty: number };
+}
+
+export type SelectedEntityInfo =
+  | SelectedUnitInfo
+  | SelectedBuildingInfo
+  | SelectedResourceInfo;
 
 export interface UiState {
   resources: Resources;

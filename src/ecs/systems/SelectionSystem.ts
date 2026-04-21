@@ -11,7 +11,19 @@ import type { EcsWorld } from '../world';
 type SelectableWithPos = With<Entity, 'position' | 'selectable'>;
 
 function toSelectedInfo(entity: SelectableWithPos): SelectedEntityInfo | null {
-  if (entity.id === undefined || !entity.health) return null;
+  if (entity.id === undefined) return null;
+  const r = (entity as Entity).resourceNode;
+  if (r && !entity.unit && !entity.building) {
+    return {
+      kind: 'resource',
+      id: entity.id,
+      resourceType: r.type,
+      amount: Math.floor(r.amount),
+      maxAmount: r.maxAmount,
+      tile: { tx: entity.position.tx, ty: entity.position.ty },
+    };
+  }
+  if (!entity.health) return null;
   if (entity.unit) {
     return {
       kind: 'unit',
@@ -76,6 +88,7 @@ export class SelectionSystem {
     this.clearSelection();
     const candidates = this.world.with('position', 'selectable');
     let building: Entity | null = null;
+    let resource: Entity | null = null;
     for (const entity of candidates) {
       if (entity.unit && entity.position.tx === tx && entity.position.ty === ty) {
         entity.selectable.selected = true;
@@ -92,10 +105,22 @@ export class SelectionSystem {
           building = entity;
         }
       }
+      if (
+        entity.resourceNode &&
+        !entity.building &&
+        entity.position.tx === tx &&
+        entity.position.ty === ty
+      ) {
+        resource = entity;
+      }
     }
     if (building?.selectable) {
       building.selectable.selected = true;
       return building;
+    }
+    if (resource?.selectable) {
+      resource.selectable.selected = true;
+      return resource;
     }
     return null;
   }
@@ -205,6 +230,17 @@ export class SelectionSystem {
       g.setDepth(
         selected.position.tx + w - 1 + (selected.position.ty + h - 1) - 0.1,
       );
+    } else if (e.resourceNode && !e.unit) {
+      // Resource tile selection outlines a single diamond.
+      const { sx, sy } = tileToScreen(selected.position);
+      g.beginPath();
+      g.moveTo(sx, sy - 16);
+      g.lineTo(sx + 32, sy);
+      g.lineTo(sx, sy + 16);
+      g.lineTo(sx - 32, sy);
+      g.closePath();
+      g.strokePath();
+      g.setDepth(tileDepth(selected.position) + 0.5);
     } else {
       const { sx, sy } = tileToScreen(selected.position);
       g.strokeEllipse(sx, sy, 36, 18);

@@ -45,6 +45,7 @@ export function createResourceNode(
       amount: max,
       maxAmount: max,
     },
+    selectable: { selected: false },
   });
   world.add(entity);
   return entity;

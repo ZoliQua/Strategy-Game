@@ -292,6 +292,10 @@ export class GameScene extends Phaser.Scene {
       const node = enemy ? null : this.findResourceNodeAt(tile.tx, tile.ty);
       for (const entity of selectedAll) {
         if (entity.owner?.playerId !== 1) continue;
+        // Any new right-click order overrides whatever the unit was
+        // doing — clear gather state + build command so the villager
+        // actually listens.
+        this.clearUnitOrders(entity);
         if (enemy && entity.attacker) {
           this.world.addComponent(entity, 'attackIntent', {
             targetId: enemy.id ?? 0,
@@ -307,6 +311,18 @@ export class GameScene extends Phaser.Scene {
         this.world.addComponent(entity, 'moveIntent', { target: tile });
       }
     }
+  }
+
+  private clearUnitOrders(
+    entity: import('../ecs/components').Entity,
+  ): void {
+    if (entity.gatherer) {
+      entity.gatherer.targetNodeId = undefined;
+      entity.gatherer.dropoffId = undefined;
+    }
+    if (entity.gatherIntent) this.world.removeComponent(entity, 'gatherIntent');
+    if (entity.attackIntent) this.world.removeComponent(entity, 'attackIntent');
+    if (entity.buildCommand) this.world.removeComponent(entity, 'buildCommand');
   }
 
   private onPointerUp(pointer: Phaser.Input.Pointer): void {

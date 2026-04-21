@@ -77,21 +77,32 @@ describe('round-trip tile→screen→tile', () => {
   }
 });
 
-describe('screenToTileFloor', () => {
-  it('floors a point inside (2,3) back to (2,3)', () => {
+describe('screenToTileFloor (diamond-accurate pick)', () => {
+  it('exact tile centre picks that tile', () => {
     const s = tileToScreen({ tx: 2, ty: 3 });
-    const shifted = { sx: s.sx + 4, sy: s.sy + 2 };
-    expect(screenToTileFloor(shifted)).toEqual({ tx: 2, ty: 3 });
+    expect(screenToTileFloor(s)).toEqual({ tx: 2, ty: 3 });
   });
 
-  it('floors origin to (0,0)', () => {
+  it('small offsets from centre stay on the same tile', () => {
+    const s = tileToScreen({ tx: 2, ty: 3 });
+    expect(screenToTileFloor({ sx: s.sx + 4, sy: s.sy + 2 })).toEqual({ tx: 2, ty: 3 });
+    expect(screenToTileFloor({ sx: s.sx - 4, sy: s.sy - 2 })).toEqual({ tx: 2, ty: 3 });
+  });
+
+  it('origin maps to (0,0)', () => {
     expect(screenToTileFloor({ sx: 0, sy: 0 })).toEqual({ tx: 0, ty: 0 });
   });
 
-  it('floors negatives correctly', () => {
+  it('a point inside tile (0,0) near its right edge still snaps to (0,0)', () => {
+    // (20, 5) lies inside tile (0,0)'s diamond (|20|/32 + |5|/16 = 0.94).
+    // Flooring the fractional tile coord used to misidentify this as
+    // (0, -1) — diamond-accurate picking returns (0, 0).
+    expect(screenToTileFloor({ sx: 20, sy: 5 })).toEqual({ tx: 0, ty: 0 });
+  });
+
+  it('handles negative tiles', () => {
     const s = tileToScreen({ tx: -1, ty: -1 });
-    const shifted = { sx: s.sx + 1, sy: s.sy + 1 };
-    expect(screenToTileFloor(shifted)).toEqual({ tx: -1, ty: -1 });
+    expect(screenToTileFloor(s)).toEqual({ tx: -1, ty: -1 });
   });
 });
 

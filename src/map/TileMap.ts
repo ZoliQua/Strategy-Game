@@ -106,7 +106,7 @@ export class TileMap {
    * blend-mode complexity of partial erase+draw.
    */
   applyFog(fog: FogOfWarData): void {
-    if (this.lastFogRevision === fog.revision) return;
+    if (this.lastFogRevision === fog.revision && this.lastFogRevision !== -1) return;
     this.fogRt.clear();
     const raw = fog.raw();
     const full = this.fogQuad(1);
