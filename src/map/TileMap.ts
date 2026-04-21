@@ -2,18 +2,14 @@ import Phaser from 'phaser';
 import { TILE_HEIGHT, TILE_WIDTH } from '../config/constants';
 import { tileToScreen, type TileCoord } from '../iso/coordinates';
 import { tileDepth } from '../iso/depth';
+import type { MapData } from './MapData';
+import { TERRAIN_TEXTURE_KEYS } from './TerrainTypes';
 
-export const TERRAIN_TEXTURE = 'terrain_grass';
 const HIGHLIGHT_DEPTH_OFFSET = 0.5;
 
-export interface TileMapOptions {
-  readonly width: number;
-  readonly height: number;
-}
-
 /**
- * Renders a flat grid of grass tiles in isometric projection.
- * M0 placeholder — terrain types and variation land in M1.
+ * Renders terrain tiles from a MapData in isometric projection and
+ * owns the hover / selection overlays.
  */
 export class TileMap {
   public readonly width: number;
@@ -21,15 +17,28 @@ export class TileMap {
 
   private readonly scene: Phaser.Scene;
   private readonly layer: Phaser.GameObjects.Layer;
+  private readonly mapData: MapData;
   private highlight: Phaser.GameObjects.Graphics | null = null;
   private selection: Phaser.GameObjects.Graphics | null = null;
 
-  constructor(scene: Phaser.Scene, options: TileMapOptions) {
+  constructor(scene: Phaser.Scene, mapData: MapData) {
     this.scene = scene;
-    this.width = options.width;
-    this.height = options.height;
+    this.mapData = mapData;
+    this.width = mapData.width;
+    this.height = mapData.height;
     this.layer = scene.add.layer();
     this.build();
+  }
+
+  private build(): void {
+    this.mapData.forEachTile(({ tx, ty }, terrain) => {
+      const { sx, sy } = tileToScreen({ tx, ty });
+      const sprite = this.scene.add
+        .image(sx, sy, TERRAIN_TEXTURE_KEYS[terrain])
+        .setOrigin(0.5, 0.5)
+        .setDepth(tileDepth({ tx, ty }));
+      this.layer.add(sprite);
+    });
   }
 
   setHoverTile(tile: TileCoord | null): void {
@@ -52,6 +61,24 @@ export class TileMap {
       this.selection = this.drawDiamondOutline(0xffffff, 1);
     }
     this.placeOverlay(this.selection, tile);
+  }
+
+  /** World-coord bounds (sx_min, sy_min, sx_max, sy_max). */
+  getWorldBounds(): { minX: number; minY: number; maxX: number; maxY: number } {
+    const corners = [
+      tileToScreen({ tx: 0, ty: 0 }),
+      tileToScreen({ tx: this.width - 1, ty: 0 }),
+      tileToScreen({ tx: 0, ty: this.height - 1 }),
+      tileToScreen({ tx: this.width - 1, ty: this.height - 1 }),
+    ];
+    const xs = corners.map((c) => c.sx);
+    const ys = corners.map((c) => c.sy);
+    return {
+      minX: Math.min(...xs),
+      minY: Math.min(...ys),
+      maxX: Math.max(...xs),
+      maxY: Math.max(...ys),
+    };
   }
 
   private placeOverlay(
@@ -81,37 +108,6 @@ export class TileMap {
     g.strokePath();
     g.setVisible(false);
     return g;
-  }
-
-  private build(): void {
-    for (let ty = 0; ty < this.height; ty++) {
-      for (let tx = 0; tx < this.width; tx++) {
-        const { sx, sy } = tileToScreen({ tx, ty });
-        const sprite = this.scene.add
-          .image(sx, sy, TERRAIN_TEXTURE)
-          .setOrigin(0.5, 0.5)
-          .setDepth(tileDepth({ tx, ty }));
-        this.layer.add(sprite);
-      }
-    }
-  }
-
-  /** World-coord bounds (sx_min, sy_min, sx_max, sy_max). Useful for camera clamp. */
-  getWorldBounds(): { minX: number; minY: number; maxX: number; maxY: number } {
-    const corners = [
-      tileToScreen({ tx: 0, ty: 0 }),
-      tileToScreen({ tx: this.width - 1, ty: 0 }),
-      tileToScreen({ tx: 0, ty: this.height - 1 }),
-      tileToScreen({ tx: this.width - 1, ty: this.height - 1 }),
-    ];
-    const xs = corners.map((c) => c.sx);
-    const ys = corners.map((c) => c.sy);
-    return {
-      minX: Math.min(...xs),
-      minY: Math.min(...ys),
-      maxX: Math.max(...xs),
-      maxY: Math.max(...ys),
-    };
   }
 
   destroy(): void {

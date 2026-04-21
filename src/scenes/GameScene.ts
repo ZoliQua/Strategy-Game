@@ -9,6 +9,8 @@ import type { TileCoord } from '../iso/coordinates';
 import { tileEquals } from '../iso/coordinates';
 import { pickTile } from '../iso/picking';
 import { hu } from '../i18n/hu';
+import { MapData } from '../map/MapData';
+import { TERRAIN } from '../map/TerrainTypes';
 import { TileMap } from '../map/TileMap';
 import { CameraController } from './systems/CameraController';
 
@@ -28,10 +30,9 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor('#0d1016');
 
-    this.tileMap = new TileMap(this, {
-      width: DEFAULT_MAP_SIZE,
-      height: DEFAULT_MAP_SIZE,
-    });
+    const mapData = new MapData(DEFAULT_MAP_SIZE, DEFAULT_MAP_SIZE);
+    this.seedDemoTerrain(mapData);
+    this.tileMap = new TileMap(this, mapData);
 
     const bounds = this.tileMap.getWorldBounds();
     const padding = 200;
@@ -68,6 +69,33 @@ export class GameScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
 
     this.createOverlayText();
+  }
+
+  private seedDemoTerrain(map: MapData): void {
+    // M1.2 smoke-test variety — replaced by the real generator in M1.4.
+    const forestClusters: Array<[number, number]> = [
+      [3, 3],
+      [50, 5],
+      [5, 55],
+      [55, 55],
+      [30, 10],
+    ];
+    for (const [cx, cy] of forestClusters) {
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          if (Math.abs(dx) + Math.abs(dy) > 3) continue;
+          if (cx + dx < 0 || cy + dy < 0 || cx + dx >= map.width || cy + dy >= map.height) continue;
+          map.setTile(cx + dx, cy + dy, TERRAIN.forest);
+        }
+      }
+    }
+    map.setTile(15, 20, TERRAIN.gold_mine);
+    map.setTile(40, 40, TERRAIN.gold_mine);
+    map.setTile(25, 30, TERRAIN.berries);
+    map.setTile(20, 25, TERRAIN.berries);
+    for (let i = 0; i < 8; i++) {
+      map.setTile(i, 0, TERRAIN.water);
+    }
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
