@@ -9,8 +9,7 @@ import type { TileCoord } from '../iso/coordinates';
 import { tileEquals } from '../iso/coordinates';
 import { pickTile } from '../iso/picking';
 import { hu } from '../i18n/hu';
-import { MapData } from '../map/MapData';
-import { TERRAIN } from '../map/TerrainTypes';
+import { generateMap } from '../map/generator';
 import { TileMap } from '../map/TileMap';
 import { CameraController } from './systems/CameraController';
 
@@ -22,6 +21,7 @@ export class GameScene extends Phaser.Scene {
   private selectionSystem!: SelectionSystem;
   private moveIntentSystem!: MoveIntentSystem;
   private hoverTile: TileCoord | null = null;
+  private playerStart: TileCoord = { tx: 10, ty: 10 };
 
   constructor() {
     super({ key: 'GameScene' });
@@ -30,9 +30,15 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor('#0d1016');
 
-    const mapData = new MapData(DEFAULT_MAP_SIZE, DEFAULT_MAP_SIZE);
-    this.seedDemoTerrain(mapData);
-    this.tileMap = new TileMap(this, mapData);
+    const generated = generateMap({
+      template: 'meadow',
+      width: DEFAULT_MAP_SIZE,
+      height: DEFAULT_MAP_SIZE,
+      seed: 42,
+      playerCount: 4,
+    });
+    this.tileMap = new TileMap(this, generated.map);
+    this.playerStart = generated.playerStarts[0] ?? { tx: 10, ty: 10 };
 
     const bounds = this.tileMap.getWorldBounds();
     const padding = 200;
@@ -43,9 +49,8 @@ export class GameScene extends Phaser.Scene {
       bounds.maxY - bounds.minY + padding * 2,
     );
 
-    const centerX = (bounds.minX + bounds.maxX) / 2;
-    const centerY = (bounds.minY + bounds.maxY) / 2;
-    this.cameras.main.centerOn(centerX, centerY);
+    const startScreen = this.playerStartScreen();
+    this.cameras.main.centerOn(startScreen.sx, startScreen.sy);
 
     this.cameraController = new CameraController(this);
 
@@ -54,9 +59,13 @@ export class GameScene extends Phaser.Scene {
     this.selectionSystem = new SelectionSystem(this, this.world);
     this.moveIntentSystem = new MoveIntentSystem(this.world);
 
-    createVillager(this.world, { tile: { tx: 10, ty: 10 } });
-    createVillager(this.world, { tile: { tx: 12, ty: 14 } });
-    createVillager(this.world, { tile: { tx: 11, ty: 12 } });
+    createVillager(this.world, { tile: this.playerStart });
+    createVillager(this.world, {
+      tile: { tx: this.playerStart.tx + 1, ty: this.playerStart.ty + 1 },
+    });
+    createVillager(this.world, {
+      tile: { tx: this.playerStart.tx - 1, ty: this.playerStart.ty + 1 },
+    });
 
     if (!this.scene.isActive('HUDScene')) {
       this.scene.launch('HUDScene');
@@ -71,31 +80,12 @@ export class GameScene extends Phaser.Scene {
     this.createOverlayText();
   }
 
-  private seedDemoTerrain(map: MapData): void {
-    // M1.2 smoke-test variety — replaced by the real generator in M1.4.
-    const forestClusters: Array<[number, number]> = [
-      [3, 3],
-      [50, 5],
-      [5, 55],
-      [55, 55],
-      [30, 10],
-    ];
-    for (const [cx, cy] of forestClusters) {
-      for (let dy = -2; dy <= 2; dy++) {
-        for (let dx = -2; dx <= 2; dx++) {
-          if (Math.abs(dx) + Math.abs(dy) > 3) continue;
-          if (cx + dx < 0 || cy + dy < 0 || cx + dx >= map.width || cy + dy >= map.height) continue;
-          map.setTile(cx + dx, cy + dy, TERRAIN.forest);
-        }
-      }
-    }
-    map.setTile(15, 20, TERRAIN.gold_mine);
-    map.setTile(40, 40, TERRAIN.gold_mine);
-    map.setTile(25, 30, TERRAIN.berries);
-    map.setTile(20, 25, TERRAIN.berries);
-    for (let i = 0; i < 8; i++) {
-      map.setTile(i, 0, TERRAIN.water);
-    }
+  private playerStartScreen(): { sx: number; sy: number } {
+    const { tx, ty } = this.playerStart;
+    return {
+      sx: (tx - ty) * 32,
+      sy: (tx + ty) * 16,
+    };
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
