@@ -155,6 +155,9 @@ export function createBuilding(
   if (TRAINERS.has(spec.type) && !underConstruction) {
     entity.trainingQueue = { entries: [], maxQueue: 5 };
   }
+  entity.fogEmitter = {
+    sightRange: spec.type === 'tower' ? 9 : 4,
+  };
   world.add(entity);
   return entity;
 }

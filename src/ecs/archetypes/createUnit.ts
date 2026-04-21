@@ -48,6 +48,14 @@ export function createUnit(
       cooldownRemaining: 0,
     };
   }
+  entity.fogEmitter = {
+    sightRange:
+      options.type === 'scout'
+        ? 7
+        : options.type === 'archer' || options.type === 'crossbowman'
+        ? 6
+        : 5,
+  };
   world.add(entity);
   return entity;
 }

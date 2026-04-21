@@ -17,8 +17,10 @@ import { queueUnit } from '../ecs/queueUnit';
 import { CombatSystem } from '../ecs/systems/CombatSystem';
 import { ConstructionSystem } from '../ecs/systems/ConstructionSystem';
 import { DeathSystem } from '../ecs/systems/DeathSystem';
+import { FogOfWarSystem } from '../ecs/systems/FogOfWarSystem';
 import { GatheringSystem } from '../ecs/systems/GatheringSystem';
 import { HealthBarSystem } from '../ecs/systems/HealthBarSystem';
+import { FogOfWarData } from '../map/FogOfWarData';
 import { MovementSystem } from '../ecs/systems/MovementSystem';
 import { PopulationSystem } from '../ecs/systems/PopulationSystem';
 import { TrainingSystem } from '../ecs/systems/TrainingSystem';
@@ -51,6 +53,8 @@ export class GameScene extends Phaser.Scene {
   private combatSystem!: CombatSystem;
   private deathSystem!: DeathSystem;
   private healthBarSystem!: HealthBarSystem;
+  private fogOfWarSystem!: FogOfWarSystem;
+  private fogData!: FogOfWarData;
   private players!: PlayerManager;
   private aiPlayers: AIPlayer[] = [];
   private victoryChecker!: VictoryChecker;
@@ -113,6 +117,9 @@ export class GameScene extends Phaser.Scene {
     this.combatSystem = new CombatSystem(this.world, this.mapData);
     this.deathSystem = new DeathSystem(this.world, this.mapData);
     this.healthBarSystem = new HealthBarSystem(this, this.world);
+    this.fogData = new FogOfWarData(this.mapData.width, this.mapData.height);
+    this.fogOfWarSystem = new FogOfWarSystem(this.world, this.fogData, 1);
+    this.renderSystem.setFogContext(this.fogData, 1);
 
     this.commandUnsubscribe = onCommand((cmd) => {
       if (cmd.type === 'queue-unit') {
@@ -430,6 +437,8 @@ export class GameScene extends Phaser.Scene {
       ai.update({ world: this.world, mapData: this.mapData }, delta);
     }
     this.populationSystem.update();
+    this.fogOfWarSystem.update(delta);
+    this.tileMap.applyFog(this.fogData);
     this.selectionSystem.update();
     this.renderSystem.update();
     this.healthBarSystem.update();

@@ -90,4 +90,5 @@ export interface Entity {
   };
   attackIntent?: { targetId: number };
   dying?: { ttlMs: number };
+  fogEmitter?: { sightRange: number };
 }

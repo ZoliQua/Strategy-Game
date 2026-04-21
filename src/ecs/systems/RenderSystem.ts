@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { With } from 'miniplex';
 import { tileToScreen } from '../../iso/coordinates';
 import { footprintDepth, tileDepth } from '../../iso/depth';
+import type { FogOfWarData } from '../../map/FogOfWarData';
 import type { Entity } from '../components';
 import type { EcsWorld } from '../world';
 
@@ -20,6 +21,8 @@ export class RenderSystem {
   private readonly scene: Phaser.Scene;
   private readonly world: EcsWorld;
   private readonly renderable: ReturnType<EcsWorld['with']>;
+  private fog: FogOfWarData | null = null;
+  private viewerPlayerId = 1;
 
   constructor(scene: Phaser.Scene, world: EcsWorld) {
     this.scene = scene;
@@ -32,6 +35,11 @@ export class RenderSystem {
     });
   }
 
+  setFogContext(fog: FogOfWarData, viewerPlayerId: number): void {
+    this.fog = fog;
+    this.viewerPlayerId = viewerPlayerId;
+  }
+
   update(): void {
     for (const entity of this.renderable) {
       const sprite = entity.sprite ?? this.ensureSprite(entity);
@@ -42,6 +50,7 @@ export class RenderSystem {
       applyConstructionAlpha(sprite, entity);
       applyOwnerTint(sprite, entity);
       applyDyingAlpha(sprite, entity);
+      applyFogVisibility(sprite, entity, this.fog, this.viewerPlayerId);
     }
   }
 
@@ -81,6 +90,22 @@ function renderScreenPos(entity: Renderable): { sx: number; sy: number } {
     sx: from.sx + (to.sx - from.sx) * t,
     sy: from.sy + (to.sy - from.sy) * t,
   };
+}
+
+function applyFogVisibility(
+  sprite: Phaser.GameObjects.Sprite,
+  entity: Renderable,
+  fog: FogOfWarData | null,
+  viewerPlayerId: number,
+): void {
+  if (!fog) return;
+  if (entity.owner?.playerId === viewerPlayerId) {
+    sprite.setVisible(true);
+    return;
+  }
+  // Enemy / neutral — only render on tiles that are currently visible.
+  const visible = fog.isVisible(entity.position.tx, entity.position.ty);
+  sprite.setVisible(visible);
 }
 
 const OWNER_TINTS: Record<number, number> = {
