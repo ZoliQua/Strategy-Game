@@ -4,23 +4,33 @@ import { tileToScreen, type TileCoord } from '../iso/coordinates';
 import { tileDepth } from '../iso/depth';
 import type { MapData } from './MapData';
 import { TERRAIN_TEXTURE_KEYS } from './TerrainTypes';
-import { FOG_UNEXPLORED, FOG_EXPLORED, type FogOfWarData } from './FogOfWarData';
+import { FOG_UNEXPLORED, type FogOfWarData } from './FogOfWarData';
+
+const FOG_VISIBLE_STATE = 2;
 
 const HIGHLIGHT_DEPTH_OFFSET = 0.5;
+const TERRAIN_DEPTH = -1000;
+const FOG_DEPTH = 10_000;
 
 /**
- * Renders terrain tiles from a MapData in isometric projection and
- * owns the hover / selection overlays.
+ * Renders terrain tiles from a MapData in isometric projection.
+ *
+ * Performance-wise we can't afford to keep thousands of live tile
+ * objects on a 64x64+ map (Phaser re-sorts the scene list by depth
+ * every frame). Instead we bake the whole terrain into a single
+ * RenderTexture on build and redraw individual tiles into it on
+ * demand via refreshTile(). Fog of war is rendered the same way.
  */
 export class TileMap {
   public readonly width: number;
   public readonly height: number;
 
   private readonly scene: Phaser.Scene;
-  private readonly layer: Phaser.GameObjects.Layer;
   private readonly mapData: MapData;
-  private readonly tileSprites: Phaser.GameObjects.Image[] = [];
-  private readonly fogOverlays: Phaser.GameObjects.Rectangle[] = [];
+  private readonly terrainRt: Phaser.GameObjects.RenderTexture;
+  private readonly fogRt: Phaser.GameObjects.RenderTexture;
+  private readonly originOffsetX: number;
+  private readonly originOffsetY: number;
   private lastFogRevision = -1;
   private highlight: Phaser.GameObjects.Graphics | null = null;
   private selection: Phaser.GameObjects.Graphics | null = null;
@@ -30,79 +40,111 @@ export class TileMap {
     this.mapData = mapData;
     this.width = mapData.width;
     this.height = mapData.height;
-    this.layer = scene.add.layer();
-    this.build();
+
+    const bounds = this.computeWorldBounds();
+    // Pad a bit so the edge diamonds don't clip.
+    const padding = TILE_WIDTH;
+    const rtWidth = bounds.maxX - bounds.minX + TILE_WIDTH + padding * 2;
+    const rtHeight = bounds.maxY - bounds.minY + TILE_HEIGHT + padding * 2;
+    this.originOffsetX = -bounds.minX + TILE_WIDTH / 2 + padding;
+    this.originOffsetY = -bounds.minY + TILE_HEIGHT / 2 + padding;
+
+    this.terrainRt = scene.add
+      .renderTexture(bounds.minX - padding, bounds.minY - padding, rtWidth, rtHeight)
+      .setOrigin(0, 0)
+      .setDepth(TERRAIN_DEPTH);
+    this.fogRt = scene.add
+      .renderTexture(bounds.minX - padding, bounds.minY - padding, rtWidth, rtHeight)
+      .setOrigin(0, 0)
+      .setDepth(FOG_DEPTH);
+
+    this.bakeTerrain();
   }
 
-  private build(): void {
+  private bakeTerrain(): void {
+    this.terrainRt.clear();
     this.mapData.forEachTile(({ tx, ty }, terrain) => {
       const { sx, sy } = tileToScreen({ tx, ty });
-      const sprite = this.scene.add
-        .image(sx, sy, TERRAIN_TEXTURE_KEYS[terrain])
-        .setOrigin(0.5, 0.5)
-        .setDepth(tileDepth({ tx, ty }));
-      this.layer.add(sprite);
-      this.tileSprites[ty * this.width + tx] = sprite;
+      this.terrainRt.drawFrame(
+        TERRAIN_TEXTURE_KEYS[terrain],
+        undefined,
+        sx + this.originOffsetX - TILE_WIDTH / 2,
+        sy + this.originOffsetY - TILE_HEIGHT / 2,
+      );
     });
   }
 
-  /**
-   * Lazily allocate + position fog overlays. Called once the fog data
-   * is available. Each overlay is a filled diamond via Rectangle +
-   * scaled transform, but a simple alpha Rectangle is fine at M2 —
-   * it covers a bit of the neighbour, which visually reads as fog.
-   */
-  private ensureFogOverlays(fog: FogOfWarData): void {
-    if (this.fogOverlays.length > 0) return;
-    for (let ty = 0; ty < fog.height; ty++) {
-      for (let tx = 0; tx < fog.width; tx++) {
-        const { sx, sy } = tileToScreen({ tx, ty });
-        const rect = this.scene.add
-          .rectangle(sx, sy, TILE_WIDTH, TILE_HEIGHT, 0x000000, 1)
-          .setOrigin(0.5, 0.5)
-          .setDepth(tileDepth({ tx, ty }) + 0.9);
-        this.layer.add(rect);
-        this.fogOverlays[ty * fog.width + tx] = rect;
-      }
+  /** Re-reads terrain for a single tile from MapData and repaints it. */
+  refreshTile(tx: number, ty: number): void {
+    const terrain = this.mapData.getTile(tx, ty);
+    const { sx, sy } = tileToScreen({ tx, ty });
+    const x = sx + this.originOffsetX - TILE_WIDTH / 2;
+    const y = sy + this.originOffsetY - TILE_HEIGHT / 2;
+    // Clear the tile area first (transparent) then draw the new one.
+    this.terrainRt.erase(
+      this.makeEraseRect(),
+      x,
+      y,
+    );
+    this.terrainRt.drawFrame(TERRAIN_TEXTURE_KEYS[terrain], undefined, x, y);
+  }
+
+  private eraseStamp: Phaser.GameObjects.Graphics | null = null;
+  private makeEraseRect(): Phaser.GameObjects.Graphics {
+    if (!this.eraseStamp) {
+      const g = this.scene.add.graphics().setVisible(false);
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(0, 0, TILE_WIDTH, TILE_HEIGHT);
+      this.eraseStamp = g;
     }
+    return this.eraseStamp;
   }
 
   /**
-   * Called each tick. Redraws overlays only for tiles whose fog
-   * state changed since the last revision.
+   * Repaints the fog layer whenever the scanner bumps revision (every
+   * 250 ms). Full clear + redraw is fine at this cadence and avoids
+   * blend-mode complexity of partial erase+draw.
    */
   applyFog(fog: FogOfWarData): void {
-    this.ensureFogOverlays(fog);
-    if (this.lastFogRevision === fog.revision && fog.dirtyTiles.size === 0) return;
-    // First frame: redraw all tiles.
-    const tiles = this.lastFogRevision === -1
-      ? indices(fog.width * fog.height)
-      : fog.dirtyTiles;
-    for (const idx of tiles) {
-      const overlay = this.fogOverlays[idx];
-      if (!overlay) continue;
-      const state = fog.raw()[idx]!;
-      if (state === FOG_UNEXPLORED) {
-        overlay.setAlpha(1);
-        overlay.setFillStyle(0x000000);
-      } else if (state === FOG_EXPLORED) {
-        overlay.setAlpha(0.55);
-        overlay.setFillStyle(0x000000);
-      } else {
-        overlay.setAlpha(0);
+    if (this.lastFogRevision === fog.revision) return;
+    this.fogRt.clear();
+    const raw = fog.raw();
+    const full = this.fogQuad(1);
+    const dim = this.fogQuad(0.55);
+    for (let ty = 0; ty < fog.height; ty++) {
+      for (let tx = 0; tx < fog.width; tx++) {
+        const idx = ty * fog.width + tx;
+        const state = raw[idx]!;
+        if (state === FOG_VISIBLE_STATE) continue;
+        const { sx, sy } = tileToScreen({ tx, ty });
+        const x = sx + this.originOffsetX - TILE_WIDTH / 2;
+        const y = sy + this.originOffsetY - TILE_HEIGHT / 2;
+        this.fogRt.draw(state === FOG_UNEXPLORED ? full : dim, x, y);
       }
     }
     fog.clearDirty();
     this.lastFogRevision = fog.revision;
   }
 
-  /** Re-reads terrain for a single tile from MapData and updates the sprite. */
-  refreshTile(tx: number, ty: number): void {
-    const idx = ty * this.width + tx;
-    const sprite = this.tileSprites[idx];
-    if (!sprite) return;
-    const terrain = this.mapData.getTile(tx, ty);
-    sprite.setTexture(TERRAIN_TEXTURE_KEYS[terrain]);
+  private cachedFogQuadFull: Phaser.GameObjects.Graphics | null = null;
+  private cachedFogQuadDim: Phaser.GameObjects.Graphics | null = null;
+  private fogQuad(alpha: number): Phaser.GameObjects.Graphics {
+    if (alpha === 1) {
+      if (!this.cachedFogQuadFull) {
+        const g = this.scene.add.graphics().setVisible(false);
+        g.fillStyle(0x000000, 1);
+        g.fillRect(0, 0, TILE_WIDTH, TILE_HEIGHT);
+        this.cachedFogQuadFull = g;
+      }
+      return this.cachedFogQuadFull;
+    }
+    if (!this.cachedFogQuadDim) {
+      const g = this.scene.add.graphics().setVisible(false);
+      g.fillStyle(0x000000, 0.55);
+      g.fillRect(0, 0, TILE_WIDTH, TILE_HEIGHT);
+      this.cachedFogQuadDim = g;
+    }
+    return this.cachedFogQuadDim;
   }
 
   setHoverTile(tile: TileCoord | null): void {
@@ -129,6 +171,15 @@ export class TileMap {
 
   /** World-coord bounds (sx_min, sy_min, sx_max, sy_max). */
   getWorldBounds(): { minX: number; minY: number; maxX: number; maxY: number } {
+    return this.computeWorldBounds();
+  }
+
+  private computeWorldBounds(): {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+  } {
     const corners = [
       tileToScreen({ tx: 0, ty: 0 }),
       tileToScreen({ tx: this.width - 1, ty: 0 }),
@@ -175,10 +226,12 @@ export class TileMap {
   }
 
   destroy(): void {
-    this.layer.destroy();
+    this.terrainRt.destroy();
+    this.fogRt.destroy();
+    this.highlight?.destroy();
+    this.selection?.destroy();
+    this.cachedFogQuadFull?.destroy();
+    this.cachedFogQuadDim?.destroy();
+    this.eraseStamp?.destroy();
   }
-}
-
-function* indices(n: number): IterableIterator<number> {
-  for (let i = 0; i < n; i++) yield i;
 }

@@ -32,7 +32,6 @@ import { createEcsWorld, type EcsWorld } from '../ecs/world';
 import type { TileCoord } from '../iso/coordinates';
 import { tileEquals } from '../iso/coordinates';
 import { pickTile } from '../iso/picking';
-import { hu } from '../i18n/hu';
 import { generateMap } from '../map/generator';
 import { TileMap } from '../map/TileMap';
 import { resetUiStore, uiStore } from '../ui/store';
@@ -196,7 +195,6 @@ export class GameScene extends Phaser.Scene {
       uiStore.getState().setPlacementBuilding(null);
     });
 
-    this.createOverlayText();
   }
 
   private spawnResourceNodes(): void {
@@ -546,29 +544,4 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  private createOverlayText(): void {
-    const { width, height } = this.scale;
-    const sceneActive = this.add
-      .text(width / 2, 20, hu.game.sceneActive, {
-        fontFamily: 'system-ui',
-        fontSize: '18px',
-        color: '#c9c2a6',
-      })
-      .setOrigin(0.5, 0)
-      .setScrollFactor(0)
-      .setDepth(10_000);
-    const hint = this.add
-      .text(width / 2, height - 24, hu.game.hint, {
-        fontFamily: 'system-ui',
-        fontSize: '13px',
-        color: '#7e7a6b',
-      })
-      .setOrigin(0.5, 0.5)
-      .setScrollFactor(0)
-      .setDepth(10_000);
-
-    // Avoid unused lint noise; these objects live for the scene's lifetime.
-    void sceneActive;
-    void hint;
-  }
 }
