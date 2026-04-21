@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import { DEFAULT_MAP_SIZE } from '../config/constants';
+import { createVillager } from '../ecs/archetypes/villager';
+import { RenderSystem } from '../ecs/systems/RenderSystem';
+import { createEcsWorld, type EcsWorld } from '../ecs/world';
 import type { TileCoord } from '../iso/coordinates';
 import { tileEquals } from '../iso/coordinates';
 import { pickTile } from '../iso/picking';
@@ -10,6 +13,8 @@ import { CameraController } from './systems/CameraController';
 export class GameScene extends Phaser.Scene {
   private tileMap!: TileMap;
   private cameraController!: CameraController;
+  private world!: EcsWorld;
+  private renderSystem!: RenderSystem;
   private hoverTile: TileCoord | null = null;
 
   constructor() {
@@ -38,6 +43,12 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.centerOn(centerX, centerY);
 
     this.cameraController = new CameraController(this);
+
+    this.world = createEcsWorld();
+    this.renderSystem = new RenderSystem(this, this.world);
+
+    createVillager(this.world, { tile: { tx: 10, ty: 10 } });
+
     this.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
 
     this.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
@@ -79,6 +90,7 @@ export class GameScene extends Phaser.Scene {
 
   private onUpdate(_time: number, delta: number): void {
     this.cameraController.update(delta);
+    this.renderSystem.update();
   }
 
   private createOverlayText(): void {
