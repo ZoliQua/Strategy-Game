@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { generatePlaceholderTextures } from '../iso/textures';
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -39,6 +40,7 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
+    generatePlaceholderTextures(this);
     this.time.delayedCall(600, () => this.scene.start('MainMenuScene'));
   }
 }

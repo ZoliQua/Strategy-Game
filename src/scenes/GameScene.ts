@@ -1,26 +1,62 @@
 import Phaser from 'phaser';
+import { DEFAULT_MAP_SIZE } from '../config/constants';
 import { hu } from '../i18n/hu';
+import { TileMap } from '../map/TileMap';
 
 export class GameScene extends Phaser.Scene {
+  private tileMap!: TileMap;
+
   constructor() {
     super({ key: 'GameScene' });
   }
 
   create(): void {
+    this.cameras.main.setBackgroundColor('#0d1016');
+
+    this.tileMap = new TileMap(this, {
+      width: DEFAULT_MAP_SIZE,
+      height: DEFAULT_MAP_SIZE,
+    });
+
+    const bounds = this.tileMap.getWorldBounds();
+    const padding = 200;
+    this.cameras.main.setBounds(
+      bounds.minX - padding,
+      bounds.minY - padding,
+      bounds.maxX - bounds.minX + padding * 2,
+      bounds.maxY - bounds.minY + padding * 2,
+    );
+
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    this.cameras.main.centerOn(centerX, centerY);
+
+    this.createOverlayText();
+  }
+
+  private createOverlayText(): void {
     const { width, height } = this.scale;
-    this.add
-      .text(width / 2, 40, hu.game.sceneActive, {
+    const sceneActive = this.add
+      .text(width / 2, 20, hu.game.sceneActive, {
         fontFamily: 'system-ui',
-        fontSize: '22px',
+        fontSize: '18px',
         color: '#c9c2a6',
       })
-      .setOrigin(0.5);
-    this.add
-      .text(width / 2, height - 30, hu.game.hint, {
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0)
+      .setDepth(10_000);
+    const hint = this.add
+      .text(width / 2, height - 24, hu.game.hint, {
         fontFamily: 'system-ui',
-        fontSize: '14px',
-        color: '#777777',
+        fontSize: '13px',
+        color: '#7e7a6b',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5, 0.5)
+      .setScrollFactor(0)
+      .setDepth(10_000);
+
+    // Avoid unused lint noise; these objects live for the scene's lifetime.
+    void sceneActive;
+    void hint;
   }
 }
