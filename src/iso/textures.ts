@@ -23,6 +23,23 @@ export function generatePlaceholderTextures(scene: Phaser.Scene): void {
     buildVillagerPlaceholder(scene);
   }
 
+  const unitPalettes: Array<[string, { shirt: number; accent: number }]> = [
+    ['unit_scout', { shirt: 0x2a8a3a, accent: 0x1a4a20 }],
+    ['unit_swordsman', { shirt: 0xc03030, accent: 0x9a9a9a }],
+    ['unit_archer', { shirt: 0x3a8a6a, accent: 0x8a5a2a }],
+    ['unit_knight', { shirt: 0x5a5a9a, accent: 0xffd85c }],
+    ['unit_pikeman', { shirt: 0x6a5a3a, accent: 0x9a9a9a }],
+    ['unit_crossbowman', { shirt: 0x2a4a8a, accent: 0x8a5a2a }],
+    ['unit_musketeer', { shirt: 0x4a4a4a, accent: 0xff6a2a }],
+    ['unit_cannon', { shirt: 0x2a2a2a, accent: 0x8a5a2a }],
+    ['unit_cavalry', { shirt: 0x8a2a2a, accent: 0xffd85c }],
+  ];
+  for (const [key, palette] of unitPalettes) {
+    if (!scene.textures.exists(key)) {
+      buildUnitPlaceholder(scene, key, palette);
+    }
+  }
+
   for (const type of Object.keys(BUILDING_SPECS) as BuildingType[]) {
     const spec = BUILDING_SPECS[type];
     if (!scene.textures.exists(spec.textureKey)) {
@@ -232,6 +249,36 @@ function buildDiamondTile(
   g.lineTo(0, halfH);
   g.closePath();
   g.strokePath();
+
+  g.generateTexture(key, w, h);
+  g.destroy();
+}
+
+function buildUnitPlaceholder(
+  scene: Phaser.Scene,
+  key: string,
+  palette: { shirt: number; accent: number },
+): void {
+  const g = scene.make.graphics({ x: 0, y: 0 }, false);
+  const w = 24;
+  const h = 40;
+
+  g.fillStyle(0xeec07b, 1);
+  g.fillCircle(w / 2, 8, 7);
+  g.lineStyle(1, 0x000000, 0.6);
+  g.strokeCircle(w / 2, 8, 7);
+
+  g.fillStyle(palette.shirt, 1);
+  g.fillRect(w / 2 - 6, 15, 12, 16);
+
+  g.fillStyle(0x2a2a2a, 1);
+  g.fillRect(w / 2 - 5, 31, 4, 8);
+  g.fillRect(w / 2 + 1, 31, 4, 8);
+
+  // Weapon stripe (accent) on the right shoulder — ranged units get it
+  // more prominent so they stand out at a glance.
+  g.fillStyle(palette.accent, 1);
+  g.fillRect(w / 2 + 5, 14, 2, 14);
 
   g.generateTexture(key, w, h);
   g.destroy();
