@@ -19,5 +19,10 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     pixelArt: true,
     antialias: false,
   },
+  fps: {
+    target: 60,
+    forceSetTimeOut: true,
+  },
+  autoFocus: false,
   scene: [BootScene, PreloadScene, MainMenuScene, GameScene],
 };

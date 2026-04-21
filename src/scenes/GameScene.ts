@@ -2,9 +2,11 @@ import Phaser from 'phaser';
 import { DEFAULT_MAP_SIZE } from '../config/constants';
 import { hu } from '../i18n/hu';
 import { TileMap } from '../map/TileMap';
+import { CameraController } from './systems/CameraController';
 
 export class GameScene extends Phaser.Scene {
   private tileMap!: TileMap;
+  private cameraController!: CameraController;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -31,7 +33,14 @@ export class GameScene extends Phaser.Scene {
     const centerY = (bounds.minY + bounds.maxY) / 2;
     this.cameras.main.centerOn(centerX, centerY);
 
+    this.cameraController = new CameraController(this);
+    this.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
+
     this.createOverlayText();
+  }
+
+  private onUpdate(_time: number, delta: number): void {
+    this.cameraController.update(delta);
   }
 
   private createOverlayText(): void {
