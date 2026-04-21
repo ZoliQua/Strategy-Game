@@ -61,7 +61,7 @@ function toSelectedInfo(entity: SelectableWithPos): SelectedEntityInfo | null {
 export class SelectionSystem {
   private readonly scene: Phaser.Scene;
   private readonly world: EcsWorld;
-  private indicator: Phaser.GameObjects.Graphics | null = null;
+  private indicators: Phaser.GameObjects.Graphics[] = [];
 
   constructor(scene: Phaser.Scene, world: EcsWorld) {
     this.scene = scene;
@@ -100,6 +100,43 @@ export class SelectionSystem {
     return null;
   }
 
+  /**
+   * Selects all own units whose tile lies inside the given world
+   * rectangle. Buildings are excluded — drag-selecting town centres
+   * together with villagers is almost never what the player wants.
+   */
+  selectUnitsInWorldRect(
+    minSx: number,
+    minSy: number,
+    maxSx: number,
+    maxSy: number,
+    playerId: number,
+    additive = false,
+  ): number {
+    if (!additive) this.clearSelection();
+    const [x0, x1] = minSx < maxSx ? [minSx, maxSx] : [maxSx, minSx];
+    const [y0, y1] = minSy < maxSy ? [minSy, maxSy] : [maxSy, minSy];
+    let count = 0;
+    const candidates = this.world.with('position', 'selectable', 'unit');
+    for (const entity of candidates) {
+      if (entity.owner?.playerId !== playerId) continue;
+      const sx = (entity.position.tx - entity.position.ty) * 32;
+      const sy = (entity.position.tx + entity.position.ty) * 16;
+      if (sx < x0 || sx > x1 || sy < y0 || sy > y1) continue;
+      entity.selectable.selected = true;
+      count++;
+    }
+    return count;
+  }
+
+  getAllSelected(): Entity[] {
+    const out: Entity[] = [];
+    for (const entity of this.world.with('selectable', 'position')) {
+      if (entity.selectable.selected) out.push(entity as Entity);
+    }
+    return out;
+  }
+
   clearSelection(): void {
     const all = this.world.with('selectable');
     for (const entity of all) {
@@ -116,22 +153,37 @@ export class SelectionSystem {
   }
 
   update(): void {
-    const selected = this.getSelected();
-    if (!selected) {
-      this.indicator?.setVisible(false);
+    const selected = this.getAllSelected();
+    this.ensureIndicators(selected.length);
+    if (selected.length === 0) {
       uiStore.getState().setSelectedEntity(null);
       return;
     }
-    this.drawIndicator(selected);
-    uiStore.getState().setSelectedEntity(toSelectedInfo(selected));
+    selected.forEach((entity, i) => {
+      this.drawIndicator(this.indicators[i]!, entity as SelectableWithPos);
+    });
+    // Primary selection for the HUD = first (works for single-select
+    // and gives a meaningful panel for groups).
+    uiStore.getState().setSelectedEntity(
+      toSelectedInfo(selected[0] as SelectableWithPos),
+    );
   }
 
-  private drawIndicator(selected: SelectableWithPos): void {
-    if (!this.indicator) {
-      this.indicator = this.scene.add.graphics();
+  private ensureIndicators(count: number): void {
+    while (this.indicators.length < count) {
+      this.indicators.push(this.scene.add.graphics());
     }
-    this.indicator.clear();
-    this.indicator.lineStyle(2, 0x8bc34a, 1);
+    for (let i = count; i < this.indicators.length; i++) {
+      this.indicators[i]!.setVisible(false);
+    }
+  }
+
+  private drawIndicator(
+    g: Phaser.GameObjects.Graphics,
+    selected: SelectableWithPos,
+  ): void {
+    g.clear();
+    g.lineStyle(2, 0x8bc34a, 1);
     const e = selected as Entity;
     if (e.building) {
       const w = e.building.footprint.width;
@@ -143,21 +195,21 @@ export class SelectionSystem {
       const { sx, sy } = tileToScreen(centerTile);
       const halfW = ((w + h) * 32) / 2;
       const halfH = ((w + h) * 16) / 2;
-      this.indicator.beginPath();
-      this.indicator.moveTo(sx, sy - halfH);
-      this.indicator.lineTo(sx + halfW, sy);
-      this.indicator.lineTo(sx, sy + halfH);
-      this.indicator.lineTo(sx - halfW, sy);
-      this.indicator.closePath();
-      this.indicator.strokePath();
-      this.indicator.setDepth(
+      g.beginPath();
+      g.moveTo(sx, sy - halfH);
+      g.lineTo(sx + halfW, sy);
+      g.lineTo(sx, sy + halfH);
+      g.lineTo(sx - halfW, sy);
+      g.closePath();
+      g.strokePath();
+      g.setDepth(
         selected.position.tx + w - 1 + (selected.position.ty + h - 1) - 0.1,
       );
     } else {
       const { sx, sy } = tileToScreen(selected.position);
-      this.indicator.strokeEllipse(sx, sy, 36, 18);
-      this.indicator.setDepth(tileDepth(selected.position) - 0.1);
+      g.strokeEllipse(sx, sy, 36, 18);
+      g.setDepth(tileDepth(selected.position) - 0.1);
     }
-    this.indicator.setVisible(true);
+    g.setVisible(true);
   }
 }

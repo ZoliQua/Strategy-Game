@@ -58,6 +58,9 @@ export class GameScene extends Phaser.Scene {
   private gameOverTriggered = false;
   private commandUnsubscribe: (() => void) | null = null;
   private buildGhost: Phaser.GameObjects.Image | null = null;
+  private dragStart: { sx: number; sy: number; screenX: number; screenY: number } | null = null;
+  private dragRect: Phaser.GameObjects.Rectangle | null = null;
+  private readonly DRAG_THRESHOLD_PX = 8;
   private mapData!: import('../map/MapData').MapData;
   private hoverTile: TileCoord | null = null;
   private playerStart: TileCoord = { tx: 10, ty: 10 };
@@ -168,6 +171,7 @@ export class GameScene extends Phaser.Scene {
     this.input.mouse?.disableContextMenu();
     this.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
+    this.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
     this.input.keyboard?.on('keydown-ESC', () => {
       uiStore.getState().setPlacementBuilding(null);
     });
@@ -202,11 +206,17 @@ export class GameScene extends Phaser.Scene {
     if (tile === null && this.hoverTile !== null) {
       this.hoverTile = null;
       this.tileMap.setHoverTile(null);
-      return;
-    }
-    if (tile && (!this.hoverTile || !tileEquals(tile, this.hoverTile))) {
+    } else if (tile && (!this.hoverTile || !tileEquals(tile, this.hoverTile))) {
       this.hoverTile = tile;
       this.tileMap.setHoverTile(tile);
+    }
+
+    if (this.dragStart && pointer.leftButtonDown()) {
+      const dx = pointer.x - this.dragStart.screenX;
+      const dy = pointer.y - this.dragStart.screenY;
+      if (Math.abs(dx) + Math.abs(dy) > this.DRAG_THRESHOLD_PX) {
+        this.updateDragRect(pointer);
+      }
     }
   }
 
@@ -230,28 +240,89 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (pointer.leftButtonDown()) {
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      this.dragStart = { sx: world.x, sy: world.y, screenX: pointer.x, screenY: pointer.y };
+      // Single-click selection fires on pointer UP (so drag-select is
+      // possible). We still clear the tile outline here.
       this.tileMap.setSelectedTile(tile);
-      if (tile) this.selectionSystem.selectAtTile(tile.tx, tile.ty);
-      else this.selectionSystem.clearSelection();
     } else if (pointer.rightButtonDown() && tile) {
-      const selected = this.selectionSystem.getSelected();
-      if (!selected) return;
-      const enemy = this.findEnemyAt(tile.tx, tile.ty, selected);
-      if (enemy && selected.attacker) {
-        this.world.addComponent(selected, 'attackIntent', {
-          targetId: enemy.id ?? 0,
-        });
-        return;
-      }
-      const node = this.findResourceNodeAt(tile.tx, tile.ty);
-      if (node && selected.gatherer) {
-        this.world.addComponent(selected, 'gatherIntent', {
-          nodeId: node.id ?? 0,
-        });
-      } else {
-        this.world.addComponent(selected, 'moveIntent', { target: tile });
+      const selectedAll = this.selectionSystem.getAllSelected();
+      if (selectedAll.length === 0) return;
+      const first = selectedAll[0]!;
+      const enemy = this.findEnemyAt(tile.tx, tile.ty, first);
+      const node = enemy ? null : this.findResourceNodeAt(tile.tx, tile.ty);
+      for (const entity of selectedAll) {
+        if (entity.owner?.playerId !== 1) continue;
+        if (enemy && entity.attacker) {
+          this.world.addComponent(entity, 'attackIntent', {
+            targetId: enemy.id ?? 0,
+          });
+          continue;
+        }
+        if (node && entity.gatherer) {
+          this.world.addComponent(entity, 'gatherIntent', {
+            nodeId: node.id ?? 0,
+          });
+          continue;
+        }
+        this.world.addComponent(entity, 'moveIntent', { target: tile });
       }
     }
+  }
+
+  private onPointerUp(pointer: Phaser.Input.Pointer): void {
+    if (!this.dragStart) return;
+    const start = this.dragStart;
+    this.dragStart = null;
+
+    const dx = pointer.x - start.screenX;
+    const dy = pointer.y - start.screenY;
+    const didDrag = Math.abs(dx) + Math.abs(dy) > this.DRAG_THRESHOLD_PX;
+    if (this.dragRect) {
+      this.dragRect.destroy();
+      this.dragRect = null;
+    }
+    if (didDrag) {
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      const additive = pointer.event?.shiftKey ?? false;
+      this.selectionSystem.selectUnitsInWorldRect(
+        start.sx,
+        start.sy,
+        world.x,
+        world.y,
+        1,
+        additive,
+      );
+      return;
+    }
+    // Simple click → select the tile under the cursor.
+    const tile = pickTile(
+      pointer.x,
+      pointer.y,
+      this.cameras.main,
+      this.tileMap.width,
+      this.tileMap.height,
+    );
+    if (tile) this.selectionSystem.selectAtTile(tile.tx, tile.ty);
+    else this.selectionSystem.clearSelection();
+  }
+
+  private updateDragRect(pointer: Phaser.Input.Pointer): void {
+    if (!this.dragStart) return;
+    if (!this.dragRect) {
+      this.dragRect = this.add
+        .rectangle(0, 0, 1, 1, 0x8bc34a, 0.12)
+        .setStrokeStyle(1, 0x8bc34a, 0.9)
+        .setOrigin(0, 0)
+        .setScrollFactor(0)
+        .setDepth(10_000);
+    }
+    const x0 = Math.min(this.dragStart.screenX, pointer.x);
+    const y0 = Math.min(this.dragStart.screenY, pointer.y);
+    const x1 = Math.max(this.dragStart.screenX, pointer.x);
+    const y1 = Math.max(this.dragStart.screenY, pointer.y);
+    this.dragRect.setPosition(x0, y0);
+    this.dragRect.setSize(x1 - x0, y1 - y0);
   }
 
   private findEnemyAt(
