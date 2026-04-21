@@ -69,7 +69,7 @@ export class GatheringSystem {
       this.retarget(v);
       return;
     }
-    if (isAdjacentOrSame(v.position, node.position)) {
+    if (isAdjacentToNode(v.position, node)) {
       this.gather(v, node, dt);
       return;
     }
@@ -143,7 +143,9 @@ export class GatheringSystem {
       | ResourceNode
       | undefined;
     if (!node) return;
-    const goal = findAdjacentPassable(this.mapData, node.position, v.position);
+    const goal = (node as Entity).building
+      ? findAdjacentToBuildingNode(this.mapData, node, v.position)
+      : findAdjacentPassable(this.mapData, node.position, v.position);
     if (!goal) return;
     const path = findPath(this.mapData, v.position, goal);
     if (!path) return;
@@ -180,8 +182,14 @@ export class GatheringSystem {
   }
 
   private depleteNode(node: ResourceNode): void {
+    if ((node as Entity).building) {
+      // Farms keep the building but drop the resourceNode tag so no
+      // further villagers come here to gather.
+      this.world.removeComponent(node as Entity, 'resourceNode');
+      return;
+    }
     const { tx, ty } = node.position;
-    // Resource tiles revert to grass on depletion.
+    // Natural resource tiles revert to grass on depletion.
     const TERRAIN_GRASS = 0;
     this.mapData.setTile(tx, ty, TERRAIN_GRASS as 0);
     this.world.remove(node as Entity);
@@ -242,10 +250,19 @@ export class GatheringSystem {
   }
 }
 
-function isAdjacentOrSame(a: TileCoord, b: TileCoord): boolean {
-  const dx = Math.abs(a.tx - b.tx);
-  const dy = Math.abs(a.ty - b.ty);
-  return dx <= 1 && dy <= 1;
+function isAdjacentToNode(v: TileCoord, node: ResourceNode): boolean {
+  const b = (node as Entity).building;
+  if (!b) {
+    const dx = Math.abs(v.tx - node.position.tx);
+    const dy = Math.abs(v.ty - node.position.ty);
+    return dx <= 1 && dy <= 1;
+  }
+  return (
+    v.tx >= node.position.tx - 1 &&
+    v.tx <= node.position.tx + b.footprint.width &&
+    v.ty >= node.position.ty - 1 &&
+    v.ty <= node.position.ty + b.footprint.height
+  );
 }
 
 function isAdjacentToFootprint(v: TileCoord, d: Dropoff): boolean {
@@ -273,6 +290,33 @@ function findAdjacentPassable(
   if (candidates.length === 0) return null;
   candidates.sort((a, b) => manhattan(a, preferNear) - manhattan(b, preferNear));
   return candidates[0]!;
+}
+
+function findAdjacentToBuildingNode(
+  map: MapData,
+  node: ResourceNode,
+  preferNear: TileCoord,
+): TileCoord | null {
+  const b = (node as Entity).building;
+  if (!b) return null;
+  const { width, height } = b.footprint;
+  const candidates: TileCoord[] = [];
+  for (let dx = -1; dx <= width; dx++) {
+    candidates.push({ tx: node.position.tx + dx, ty: node.position.ty - 1 });
+    candidates.push({ tx: node.position.tx + dx, ty: node.position.ty + height });
+  }
+  for (let dy = 0; dy < height; dy++) {
+    candidates.push({ tx: node.position.tx - 1, ty: node.position.ty + dy });
+    candidates.push({ tx: node.position.tx + width, ty: node.position.ty + dy });
+  }
+  const passable = candidates.filter((t) => map.isPassable(t.tx, t.ty));
+  if (passable.length === 0) return null;
+  passable.sort(
+    (a, b2) =>
+      Math.abs(a.tx - preferNear.tx) + Math.abs(a.ty - preferNear.ty) -
+      (Math.abs(b2.tx - preferNear.tx) + Math.abs(b2.ty - preferNear.ty)),
+  );
+  return passable[0]!;
 }
 
 function findAdjacentToFootprint(

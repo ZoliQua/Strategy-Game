@@ -233,6 +233,19 @@ export class GameScene extends Phaser.Scene {
   private findResourceNodeAt(tx: number, ty: number): import('../ecs/components').Entity | null {
     const nodes = this.world.with('position', 'resourceNode');
     for (const n of nodes) {
+      // Multi-tile building nodes (e.g. farms) match any footprint tile.
+      const b = (n as import('../ecs/components').Entity).building;
+      if (b) {
+        if (
+          tx >= n.position.tx &&
+          tx < n.position.tx + b.footprint.width &&
+          ty >= n.position.ty &&
+          ty < n.position.ty + b.footprint.height
+        ) {
+          return n;
+        }
+        continue;
+      }
       if (n.position.tx === tx && n.position.ty === ty) return n;
     }
     return null;

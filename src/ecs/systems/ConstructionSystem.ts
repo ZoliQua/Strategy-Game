@@ -75,6 +75,14 @@ export class ConstructionSystem {
         accepts: spec.dropoffAccepts,
       });
     }
+    if (site.building.type === 'farm') {
+      // Farms are harvestable food sources. Finite in M1 (no regen).
+      this.world.addComponent(site as Entity, 'resourceNode', {
+        type: 'food',
+        amount: 300,
+        maxAmount: 300,
+      });
+    }
   }
 
   private walkToSite(b: Builder, site: Site): void {
