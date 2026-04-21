@@ -33,6 +33,7 @@ export class HUDScene extends Phaser.Scene {
   private selectionHp!: Phaser.GameObjects.Text;
   private buildButtons: Phaser.GameObjects.Container[] = [];
   private trainButtons: Phaser.GameObjects.Container[] = [];
+  private trainButtonSignature: string | null = null;
   private queueText!: Phaser.GameObjects.Text;
   private placementHint!: Phaser.GameObjects.Text;
   private minimap: Minimap | null = null;
@@ -131,7 +132,11 @@ export class HUDScene extends Phaser.Scene {
       .setOrigin(1, 0);
     const container = this.add.container(x, y, [bg, label, cost]);
     container.setSize(150, 20);
-    container.setInteractive({ useHandCursor: true });
+    container.setInteractive(
+      new Phaser.Geom.Rectangle(0, 0, 150, 20),
+      Phaser.Geom.Rectangle.Contains,
+    );
+    container.input!.cursor = 'pointer';
     container.on('pointerover', () => bg.setFillStyle(0x2f3a4e));
     container.on('pointerout', () => bg.setFillStyle(0x232a36));
     container.on('pointerdown', () => {
@@ -266,17 +271,33 @@ export class HUDScene extends Phaser.Scene {
     const isTrainer =
       sel?.kind === 'building' && sel.trainable && sel.trainable.length > 0;
 
-    // Recreate train buttons based on trainable units.
-    for (const btn of this.trainButtons) btn.destroy();
-    this.trainButtons = [];
+    // Only rebuild the button set when the *identity* of the trainer
+    // or its roster changes — recreating containers every tick tears
+    // them down before Phaser can deliver a pointerdown event.
+    const signature = isTrainer ? `${sel.id}:${sel.trainable!.join(',')}` : null;
+    if (signature !== this.trainButtonSignature) {
+      for (const btn of this.trainButtons) btn.destroy();
+      this.trainButtons = [];
+      this.trainButtonSignature = signature;
+      if (isTrainer) {
+        const startX = this.scale.width - 160;
+        const startY = this.scale.height - BOTTOM_PANEL_HEIGHT + 16;
+        sel.trainable!.forEach((u, i) => {
+          this.trainButtons.push(
+            this.makeTrainButton(startX, startY + i * 22, sel.id, u),
+          );
+        });
+      }
+    }
+
     if (!isTrainer) {
       this.queueText.setText('');
       return;
     }
-    const startX = this.scale.width - 160;
-    const startY = this.scale.height - BOTTOM_PANEL_HEIGHT + 16;
-    sel.trainable!.forEach((u, i) => {
-      const btn = this.makeTrainButton(startX, startY + i * 22, sel.id, u);
+
+    // Cheap per-tick update: affordability shading + queue text.
+    this.trainButtons.forEach((btn, i) => {
+      const u = sel.trainable![i]!;
       const spec = UNIT_SPECS[u];
       const affordable =
         state.resources.food >= spec.cost.food &&
@@ -287,7 +308,6 @@ export class HUDScene extends Phaser.Scene {
       bg.setFillStyle(affordable ? 0x2a3628 : 0x1a1f29);
       const label = btn.list[1] as Phaser.GameObjects.Text;
       label.setColor(affordable ? LABEL_COLOR : '#6a6a6a');
-      this.trainButtons.push(btn);
     });
     const q = sel.queue ?? [];
     this.queueText.setText(
@@ -329,7 +349,11 @@ export class HUDScene extends Phaser.Scene {
       .setOrigin(1, 0);
     const container = this.add.container(x, y, [bg, label, cost]);
     container.setSize(150, 20);
-    container.setInteractive({ useHandCursor: true });
+    container.setInteractive(
+      new Phaser.Geom.Rectangle(0, 0, 150, 20),
+      Phaser.Geom.Rectangle.Contains,
+    );
+    container.input!.cursor = 'pointer';
     container.on('pointerover', () => bg.setFillStyle(0x3a4638));
     container.on('pointerout', () => bg.setFillStyle(0x2a3628));
     container.on('pointerdown', () => {

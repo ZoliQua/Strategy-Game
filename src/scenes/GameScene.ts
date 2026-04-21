@@ -215,6 +215,26 @@ export class GameScene extends Phaser.Scene {
     };
   }
 
+  private isPointerOverHud(pointer: Phaser.Input.Pointer): boolean {
+    const h = this.scale.height;
+    const w = this.scale.width;
+    // Top bar (48 px) and bottom panel (140 px) both swallow clicks.
+    if (pointer.y <= 48) return true;
+    if (pointer.y >= h - 140) return true;
+    // Minimap (200×200 at top-right, 16 px from edges, below top bar).
+    const miniX0 = w - 216;
+    const miniY0 = 64;
+    if (
+      pointer.x >= miniX0 &&
+      pointer.x <= miniX0 + 200 &&
+      pointer.y >= miniY0 &&
+      pointer.y <= miniY0 + 200
+    ) {
+      return true;
+    }
+    return false;
+  }
+
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
     const tile = pickTile(
       pointer.x,
@@ -241,6 +261,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
+    if (this.isPointerOverHud(pointer)) return;
     const tile = pickTile(
       pointer.x,
       pointer.y,
@@ -291,6 +312,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPointerUp(pointer: Phaser.Input.Pointer): void {
+    if (this.isPointerOverHud(pointer)) {
+      this.dragStart = null;
+      if (this.dragRect) {
+        this.dragRect.destroy();
+        this.dragRect = null;
+      }
+      return;
+    }
     if (!this.dragStart) return;
     const start = this.dragStart;
     this.dragStart = null;
