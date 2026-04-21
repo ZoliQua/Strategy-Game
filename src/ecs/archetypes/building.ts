@@ -152,9 +152,20 @@ export function createBuilding(
   if (spec.dropoffAccepts && !underConstruction) {
     entity.resourceDropoff = { accepts: spec.dropoffAccepts };
   }
+  if (TRAINERS.has(spec.type) && !underConstruction) {
+    entity.trainingQueue = { entries: [], maxQueue: 5 };
+  }
   world.add(entity);
   return entity;
 }
+
+const TRAINERS: ReadonlySet<BuildingType> = new Set<BuildingType>([
+  'town_center',
+  'barracks',
+  'archery_range',
+  'stable',
+  'blacksmith',
+]);
 
 function blockFootprint(
   map: MapData,

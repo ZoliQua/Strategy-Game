@@ -6,9 +6,13 @@ import {
   TERRAIN_RESOURCE,
 } from '../ecs/archetypes/resource';
 import { createVillager } from '../ecs/archetypes/villager';
+import { queueUnit } from '../ecs/queueUnit';
 import { ConstructionSystem } from '../ecs/systems/ConstructionSystem';
 import { GatheringSystem } from '../ecs/systems/GatheringSystem';
 import { MovementSystem } from '../ecs/systems/MovementSystem';
+import { PopulationSystem } from '../ecs/systems/PopulationSystem';
+import { TrainingSystem } from '../ecs/systems/TrainingSystem';
+import { onCommand } from '../ui/events';
 import { PathfindingSystem } from '../ecs/systems/PathfindingSystem';
 import { RenderSystem } from '../ecs/systems/RenderSystem';
 import { SelectionSystem } from '../ecs/systems/SelectionSystem';
@@ -32,6 +36,9 @@ export class GameScene extends Phaser.Scene {
   private movementSystem!: MovementSystem;
   private gatheringSystem!: GatheringSystem;
   private constructionSystem!: ConstructionSystem;
+  private trainingSystem!: TrainingSystem;
+  private populationSystem!: PopulationSystem;
+  private commandUnsubscribe: (() => void) | null = null;
   private buildGhost: Phaser.GameObjects.Image | null = null;
   private mapData!: import('../map/MapData').MapData;
   private hoverTile: TileCoord | null = null;
@@ -76,6 +83,24 @@ export class GameScene extends Phaser.Scene {
     this.movementSystem = new MovementSystem(this.world);
     this.gatheringSystem = new GatheringSystem(this.world, this.mapData);
     this.constructionSystem = new ConstructionSystem(this.world, this.mapData);
+    this.trainingSystem = new TrainingSystem(this.world, this.mapData);
+    this.populationSystem = new PopulationSystem(this.world, 1);
+
+    this.commandUnsubscribe = onCommand((cmd) => {
+      if (cmd.type === 'queue-unit') {
+        const trainer = this.world.entities.find((e) => e.id === cmd.trainerId);
+        if (trainer) queueUnit(trainer, cmd.unitType);
+      } else if (cmd.type === 'cancel-queue') {
+        const trainer = this.world.entities.find((e) => e.id === cmd.trainerId);
+        if (trainer?.trainingQueue) {
+          trainer.trainingQueue.entries.splice(cmd.index, 1);
+        }
+      }
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.commandUnsubscribe?.();
+      this.commandUnsubscribe = null;
+    });
 
     const resourceNodes = this.world.with('position', 'resourceNode');
     resourceNodes.onEntityRemoved.subscribe((entity) => {
@@ -256,7 +281,9 @@ export class GameScene extends Phaser.Scene {
     this.pathfindingSystem.update();
     this.gatheringSystem.update(delta);
     this.constructionSystem.update(delta);
+    this.trainingSystem.update(delta);
     this.movementSystem.update(delta);
+    this.populationSystem.update();
     this.selectionSystem.update();
     this.renderSystem.update();
     this.updateBuildGhost();

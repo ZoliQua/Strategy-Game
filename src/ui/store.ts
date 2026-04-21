@@ -7,6 +7,11 @@ import type {
   UnitType,
 } from '../types';
 
+export interface TrainingEntryInfo {
+  unitType: UnitType;
+  progress: number; // 0..1
+}
+
 export interface SelectedUnitInfo {
   kind: 'unit';
   id: number;
@@ -23,6 +28,8 @@ export interface SelectedBuildingInfo {
   hp: { current: number; max: number };
   tile: { tx: number; ty: number };
   constructionProgress?: number;
+  trainable?: readonly UnitType[];
+  queue?: readonly TrainingEntryInfo[];
 }
 
 export type SelectedEntityInfo = SelectedUnitInfo | SelectedBuildingInfo;

@@ -1,6 +1,11 @@
 import type Phaser from 'phaser';
 import type { TileCoord } from '../iso/coordinates';
-import type { BuildingType, Direction, ResourceType } from '../types';
+import type {
+  BuildingType,
+  Direction,
+  ResourceType,
+  UnitType,
+} from '../types';
 
 /**
  * All ECS components. Miniplex entities are plain objects with any
@@ -12,7 +17,7 @@ import type { BuildingType, Direction, ResourceType } from '../types';
  */
 
 export interface UnitTag {
-  readonly unitType: 'villager' | 'swordsman' | 'archer';
+  readonly unitType: UnitType;
 }
 
 export interface Entity {
@@ -68,5 +73,10 @@ export interface Entity {
     elapsed: number;
   };
   buildCommand?: { targetId: number };
+  trainingQueue?: {
+    entries: Array<{ unitType: UnitType; elapsed: number; totalTime: number }>;
+    maxQueue: number;
+  };
   owner?: { playerId: number };
+  populationCost?: { amount: number };
 }

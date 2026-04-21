@@ -2,9 +2,18 @@ import type { With } from 'miniplex';
 import type { TileCoord } from '../../iso/coordinates';
 import type { MapData } from '../../map/MapData';
 import { findPath } from '../../map/pathfinding';
+import type { BuildingType } from '../../types';
 import { BUILDING_SPECS } from '../archetypes/building';
 import type { Entity } from '../components';
 import type { EcsWorld } from '../world';
+
+const TRAINERS: ReadonlySet<BuildingType> = new Set<BuildingType>([
+  'town_center',
+  'barracks',
+  'archery_range',
+  'stable',
+  'blacksmith',
+]);
 
 type Builder = With<Entity, 'position' | 'movable' | 'buildCommand' | 'owner'>;
 type Site = With<
@@ -81,6 +90,12 @@ export class ConstructionSystem {
         type: 'food',
         amount: 300,
         maxAmount: 300,
+      });
+    }
+    if (TRAINERS.has(site.building.type) && !(site as Entity).trainingQueue) {
+      this.world.addComponent(site as Entity, 'trainingQueue', {
+        entries: [],
+        maxQueue: 5,
       });
     }
   }

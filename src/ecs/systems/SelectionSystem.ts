@@ -2,7 +2,9 @@ import Phaser from 'phaser';
 import type { With } from 'miniplex';
 import { tileToScreen } from '../../iso/coordinates';
 import { tileDepth } from '../../iso/depth';
+import type { UnitType } from '../../types';
 import { uiStore, type SelectedEntityInfo } from '../../ui/store';
+import { UNIT_SPECS } from '../archetypes/unit';
 import type { Entity } from '../components';
 import type { EcsWorld } from '../world';
 
@@ -28,13 +30,24 @@ function toSelectedInfo(entity: SelectableWithPos): SelectedEntityInfo | null {
     };
   }
   if (entity.building) {
-    return {
+    const info: SelectedEntityInfo = {
       kind: 'building',
       id: entity.id,
       buildingType: entity.building.type,
       hp: { current: entity.health.current, max: entity.health.max },
       tile: { tx: entity.position.tx, ty: entity.position.ty },
     };
+    if (entity.trainingQueue) {
+      const trainable = (Object.keys(UNIT_SPECS) as UnitType[]).filter(
+        (u) => UNIT_SPECS[u].trainers.includes(entity.building!.type),
+      );
+      info.trainable = trainable;
+      info.queue = entity.trainingQueue.entries.map((e) => ({
+        unitType: e.unitType,
+        progress: Math.min(1, e.elapsed / e.totalTime),
+      }));
+    }
+    return info;
   }
   return null;
 }
