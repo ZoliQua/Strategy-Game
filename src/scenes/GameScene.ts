@@ -1,5 +1,10 @@
 import Phaser from 'phaser';
 import { DEFAULT_MAP_SIZE } from '../config/constants';
+import { createBuilding } from '../ecs/archetypes/building';
+import {
+  createResourceNode,
+  TERRAIN_RESOURCE,
+} from '../ecs/archetypes/resource';
 import { createVillager } from '../ecs/archetypes/villager';
 import { MovementSystem } from '../ecs/systems/MovementSystem';
 import { PathfindingSystem } from '../ecs/systems/PathfindingSystem';
@@ -64,12 +69,27 @@ export class GameScene extends Phaser.Scene {
     this.pathfindingSystem = new PathfindingSystem(this.world, this.mapData);
     this.movementSystem = new MovementSystem(this.world);
 
-    createVillager(this.world, { tile: this.playerStart });
+    this.spawnResourceNodes();
+
+    const tcOrigin = {
+      tx: this.playerStart.tx - 1,
+      ty: this.playerStart.ty - 1,
+    };
+    createBuilding(this.world, {
+      type: 'town_center',
+      origin: tcOrigin,
+      playerId: 1,
+      mapData: this.mapData,
+    });
+    // Villagers spawn south of the town center so they don't overlap.
     createVillager(this.world, {
-      tile: { tx: this.playerStart.tx + 1, ty: this.playerStart.ty + 1 },
+      tile: { tx: this.playerStart.tx, ty: this.playerStart.ty + 3 },
     });
     createVillager(this.world, {
-      tile: { tx: this.playerStart.tx - 1, ty: this.playerStart.ty + 1 },
+      tile: { tx: this.playerStart.tx + 1, ty: this.playerStart.ty + 3 },
+    });
+    createVillager(this.world, {
+      tile: { tx: this.playerStart.tx - 1, ty: this.playerStart.ty + 3 },
     });
 
     if (!this.scene.isActive('HUDScene')) {
@@ -83,6 +103,14 @@ export class GameScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
 
     this.createOverlayText();
+  }
+
+  private spawnResourceNodes(): void {
+    this.mapData.forEachTile(({ tx, ty }, terrain) => {
+      const type = TERRAIN_RESOURCE[terrain];
+      if (!type) return;
+      createResourceNode(this.world, { tile: { tx, ty }, type });
+    });
   }
 
   private playerStartScreen(): { sx: number; sy: number } {

@@ -144,10 +144,18 @@ export class HUDScene extends Phaser.Scene {
       this.selectionHp.setText('');
       return;
     }
-    this.selectionName.setText(hu.units[selected.unitType]);
-    this.selectionHp.setText(
-      `${hu.hud.hp}: ${selected.hp.current} / ${selected.hp.max}  ·  (${selected.tile.tx}, ${selected.tile.ty})`,
-    );
+    const label =
+      selected.kind === 'unit'
+        ? hu.units[selected.unitType]
+        : hu.buildings[selected.buildingType];
+    this.selectionName.setText(label);
+    const hp = `${hu.hud.hp}: ${selected.hp.current} / ${selected.hp.max}`;
+    const at = `(${selected.tile.tx}, ${selected.tile.ty})`;
+    const extra =
+      selected.kind === 'unit' && selected.carrying
+        ? `  ·  ${hu.resources[selected.carrying.type]}: ${selected.carrying.amount}`
+        : '';
+    this.selectionHp.setText(`${hp}  ·  ${at}${extra}`);
   }
 
   private ageName(age: AgeId): string {

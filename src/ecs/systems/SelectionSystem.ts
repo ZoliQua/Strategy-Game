@@ -9,13 +9,34 @@ import type { EcsWorld } from '../world';
 type SelectableWithPos = With<Entity, 'position' | 'selectable'>;
 
 function toSelectedInfo(entity: SelectableWithPos): SelectedEntityInfo | null {
-  if (!entity.unit || !entity.health || entity.id === undefined) return null;
-  return {
-    id: entity.id,
-    unitType: entity.unit.unitType,
-    hp: { current: entity.health.current, max: entity.health.max },
-    tile: { tx: entity.position.tx, ty: entity.position.ty },
-  };
+  if (entity.id === undefined || !entity.health) return null;
+  if (entity.unit) {
+    return {
+      kind: 'unit',
+      id: entity.id,
+      unitType: entity.unit.unitType,
+      hp: { current: entity.health.current, max: entity.health.max },
+      tile: { tx: entity.position.tx, ty: entity.position.ty },
+      ...(entity.gatherer?.carryingType
+        ? {
+            carrying: {
+              type: entity.gatherer.carryingType,
+              amount: entity.gatherer.carrying,
+            },
+          }
+        : {}),
+    };
+  }
+  if (entity.building) {
+    return {
+      kind: 'building',
+      id: entity.id,
+      buildingType: entity.building.type,
+      hp: { current: entity.health.current, max: entity.health.max },
+      tile: { tx: entity.position.tx, ty: entity.position.ty },
+    };
+  }
+  return null;
 }
 
 /**
@@ -34,15 +55,34 @@ export class SelectionSystem {
     this.world = world;
   }
 
-  /** Selects the first selectable entity at the given tile, or clears. */
+  /**
+   * Selects a unit on the tile if any; otherwise selects a building
+   * whose footprint covers the tile. Clears selection otherwise.
+   */
   selectAtTile(tx: number, ty: number): Entity | null {
     this.clearSelection();
     const candidates = this.world.with('position', 'selectable');
+    let building: Entity | null = null;
     for (const entity of candidates) {
-      if (entity.position.tx === tx && entity.position.ty === ty) {
+      if (entity.unit && entity.position.tx === tx && entity.position.ty === ty) {
         entity.selectable.selected = true;
         return entity;
       }
+      if (entity.building) {
+        const fp = entity.building.footprint;
+        if (
+          tx >= entity.position.tx &&
+          tx < entity.position.tx + fp.width &&
+          ty >= entity.position.ty &&
+          ty < entity.position.ty + fp.height
+        ) {
+          building = entity;
+        }
+      }
+    }
+    if (building?.selectable) {
+      building.selectable.selected = true;
+      return building;
     }
     return null;
   }

@@ -11,11 +11,13 @@ export class MapData {
   public readonly width: number;
   public readonly height: number;
   private readonly tiles: Uint8Array;
+  private readonly blocked: Uint8Array;
 
   constructor(width: number, height: number, fill: TerrainId = TERRAIN.grass) {
     this.width = width;
     this.height = height;
     this.tiles = new Uint8Array(width * height);
+    this.blocked = new Uint8Array(width * height);
     if (fill !== 0) this.tiles.fill(fill);
   }
 
@@ -39,7 +41,19 @@ export class MapData {
 
   isPassable(tx: number, ty: number): boolean {
     if (!isInsideMap({ tx, ty }, this.width, this.height)) return false;
-    return isPassable(this.tiles[ty * this.width + tx] as TerrainId);
+    const idx = ty * this.width + tx;
+    if (this.blocked[idx] === 1) return false;
+    return isPassable(this.tiles[idx] as TerrainId);
+  }
+
+  setBlocked(tx: number, ty: number, blocked: boolean): void {
+    if (!isInsideMap({ tx, ty }, this.width, this.height)) return;
+    this.blocked[ty * this.width + tx] = blocked ? 1 : 0;
+  }
+
+  isBlocked(tx: number, ty: number): boolean {
+    if (!isInsideMap({ tx, ty }, this.width, this.height)) return true;
+    return this.blocked[ty * this.width + tx] === 1;
   }
 
   /** Raw backing array, intended for renderers and save serialisation. */

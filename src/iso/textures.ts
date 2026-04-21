@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { TILE_HEIGHT, TILE_WIDTH } from '../config/constants';
+import { BUILDING_SPECS } from '../ecs/archetypes/building';
 import { TERRAIN_TEXTURE_KEYS, TERRAIN, type TerrainId } from '../map/TerrainTypes';
+import type { BuildingType } from '../types';
 
 /**
  * Generates placeholder textures procedurally so M0/M1 need no binary
@@ -20,6 +22,123 @@ export function generatePlaceholderTextures(scene: Phaser.Scene): void {
   if (!scene.textures.exists('villager_placeholder')) {
     buildVillagerPlaceholder(scene);
   }
+
+  for (const type of Object.keys(BUILDING_SPECS) as BuildingType[]) {
+    const spec = BUILDING_SPECS[type];
+    if (!scene.textures.exists(spec.textureKey)) {
+      buildPlaceholderBuilding(scene, spec.textureKey, BUILDING_PALETTE[type], spec.width, spec.height);
+    }
+  }
+}
+
+interface BuildingPalette {
+  readonly roof: number;
+  readonly wall: number;
+  readonly accent: number;
+}
+
+const BUILDING_PALETTE: Record<BuildingType, BuildingPalette> = {
+  town_center: { roof: 0x884b2a, wall: 0xd9b77f, accent: 0xffd85c },
+  house: { roof: 0x8a3a2a, wall: 0xcfb37a, accent: 0xffffff },
+  farm: { roof: 0x6a4b2a, wall: 0xa67a3a, accent: 0xffd85c },
+  lumber_camp: { roof: 0x4a331a, wall: 0x9a6a3a, accent: 0xa67a3a },
+  mining_camp: { roof: 0x555555, wall: 0x9a9a9a, accent: 0xffd85c },
+  barracks: { roof: 0x6a2222, wall: 0xcfb37a, accent: 0xff4444 },
+  archery_range: { roof: 0x2a3a6a, wall: 0xcfb37a, accent: 0x6a9acf },
+  stable: { roof: 0x5a4422, wall: 0xcfb37a, accent: 0x8a5a22 },
+  blacksmith: { roof: 0x333333, wall: 0x8a7a5a, accent: 0xff8800 },
+  tower: { roof: 0x555555, wall: 0x9a9a9a, accent: 0x7a7a7a },
+  wall: { roof: 0x555555, wall: 0x7a7a7a, accent: 0x555555 },
+  wonder: { roof: 0xcfa93a, wall: 0xfff2cf, accent: 0xffd85c },
+};
+
+function buildPlaceholderBuilding(
+  scene: Phaser.Scene,
+  key: string,
+  palette: BuildingPalette,
+  footprintW: number,
+  footprintH: number,
+): void {
+  // Render a box sitting on the full iso footprint. The texture extends
+  // upward from the base diamond to give the building some height.
+  const baseW = TILE_WIDTH * (footprintW + footprintH) / 2;
+  const baseH = TILE_HEIGHT * (footprintW + footprintH) / 2;
+  const height = Math.max(32, footprintW * 16 + footprintH * 16);
+  const texW = Math.ceil(baseW) + 8;
+  const texH = Math.ceil(baseH) + height + 8;
+  const g = scene.make.graphics({ x: 0, y: 0 }, false);
+  const cx = texW / 2;
+  const bottomY = texH - 4;
+  const topY = bottomY - baseH - height;
+  const leftX = cx - baseW / 2;
+  const rightX = cx + baseW / 2;
+  const baseTopY = bottomY - baseH;
+  const wallBaseY = baseTopY + baseH / 2;
+
+  // Base diamond (ground pattern, darker)
+  g.fillStyle(palette.wall, 0.4);
+  g.beginPath();
+  g.moveTo(cx, baseTopY);
+  g.lineTo(rightX, wallBaseY);
+  g.lineTo(cx, bottomY);
+  g.lineTo(leftX, wallBaseY);
+  g.closePath();
+  g.fillPath();
+
+  // Walls (three visible faces as a simple prism).
+  const wallTopY = topY + (baseH + height) * 0.4;
+  g.fillStyle(palette.wall, 1);
+  g.beginPath();
+  g.moveTo(cx, baseTopY);
+  g.lineTo(cx, wallTopY);
+  g.lineTo(leftX, wallTopY + baseH / 2);
+  g.lineTo(leftX, wallBaseY);
+  g.closePath();
+  g.fillPath();
+
+  g.fillStyle(shade(palette.wall, 0.85), 1);
+  g.beginPath();
+  g.moveTo(cx, baseTopY);
+  g.lineTo(cx, wallTopY);
+  g.lineTo(rightX, wallTopY + baseH / 2);
+  g.lineTo(rightX, wallBaseY);
+  g.closePath();
+  g.fillPath();
+
+  // Roof (two triangular faces forming a ridge).
+  g.fillStyle(palette.roof, 1);
+  g.beginPath();
+  g.moveTo(cx, topY);
+  g.lineTo(rightX, wallTopY + baseH / 2);
+  g.lineTo(cx, wallTopY);
+  g.closePath();
+  g.fillPath();
+
+  g.fillStyle(shade(palette.roof, 0.8), 1);
+  g.beginPath();
+  g.moveTo(cx, topY);
+  g.lineTo(leftX, wallTopY + baseH / 2);
+  g.lineTo(cx, wallTopY);
+  g.closePath();
+  g.fillPath();
+
+  // Accent (flag).
+  g.fillStyle(palette.accent, 1);
+  g.fillRect(cx - 1, topY - 12, 2, 12);
+  g.fillRect(cx, topY - 12, 6, 5);
+
+  g.lineStyle(1, 0x111111, 0.7);
+  g.strokePath();
+
+  g.generateTexture(key, texW, texH);
+  g.destroy();
+}
+
+function shade(color: number, factor: number): number {
+  const r = ((color >> 16) & 0xff) * factor;
+  const g = ((color >> 8) & 0xff) * factor;
+  const b = (color & 0xff) * factor;
+  return (Math.floor(r) << 16) | (Math.floor(g) << 8) | Math.floor(b);
 }
 
 interface Palette {

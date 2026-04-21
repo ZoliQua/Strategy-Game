@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import type { TileCoord } from '../iso/coordinates';
-import type { Direction } from '../types';
+import type { BuildingType, Direction, ResourceType } from '../types';
 
 /**
  * All ECS components. Miniplex entities are plain objects with any
@@ -36,4 +36,30 @@ export interface Entity {
     progress: number;
     facing: Direction;
   };
+  resourceNode?: {
+    type: ResourceType;
+    amount: number;
+    maxAmount: number;
+  };
+  gatherer?: {
+    /** Resource currently carried (null when empty). */
+    carryingType: ResourceType | null;
+    carrying: number;
+    capacity: number;
+    /** Per-second rate while standing next to a resource node. */
+    gatherRate: number;
+    /** Which resource node the villager is assigned to (entity id). */
+    targetNodeId?: number;
+    /** Last-known drop-off building id (town center or camp). */
+    dropoffId?: number;
+  };
+  gatherIntent?: { nodeId: number };
+  resourceDropoff?: {
+    accepts: readonly ResourceType[];
+  };
+  building?: {
+    type: BuildingType;
+    footprint: { width: number; height: number };
+  };
+  owner?: { playerId: number };
 }

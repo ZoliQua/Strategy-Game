@@ -1,17 +1,31 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type {
   AgeId,
+  BuildingType,
   Population,
   Resources,
   UnitType,
 } from '../types';
 
-export interface SelectedEntityInfo {
+export interface SelectedUnitInfo {
+  kind: 'unit';
   id: number;
   unitType: UnitType;
   hp: { current: number; max: number };
   tile: { tx: number; ty: number };
+  carrying?: { type: 'food' | 'wood' | 'gold'; amount: number };
 }
+
+export interface SelectedBuildingInfo {
+  kind: 'building';
+  id: number;
+  buildingType: BuildingType;
+  hp: { current: number; max: number };
+  tile: { tx: number; ty: number };
+  constructionProgress?: number;
+}
+
+export type SelectedEntityInfo = SelectedUnitInfo | SelectedBuildingInfo;
 
 export interface UiState {
   resources: Resources;
