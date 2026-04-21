@@ -4,6 +4,8 @@ import {
   createDefaultPlayers,
   PlayerManager,
 } from '../game/PlayerManager';
+import { AIPlayer } from '../ai/AIPlayer';
+import { EasyStrategy } from '../ai/strategies/EasyStrategy';
 import { BUILDING_SPECS, createBuilding } from '../ecs/archetypes/building';
 import {
   createResourceNode,
@@ -49,6 +51,7 @@ export class GameScene extends Phaser.Scene {
   private deathSystem!: DeathSystem;
   private healthBarSystem!: HealthBarSystem;
   private players!: PlayerManager;
+  private aiPlayers: AIPlayer[] = [];
   private commandUnsubscribe: (() => void) | null = null;
   private buildGhost: Phaser.GameObjects.Image | null = null;
   private mapData!: import('../map/MapData').MapData;
@@ -145,6 +148,9 @@ export class GameScene extends Phaser.Scene {
         });
       }
     }
+    this.aiPlayers = this.players
+      .ais()
+      .map((p) => new AIPlayer(p, new EasyStrategy()));
 
     if (!this.scene.isActive('HUDScene')) {
       this.scene.launch('HUDScene');
@@ -333,6 +339,9 @@ export class GameScene extends Phaser.Scene {
     this.combatSystem.update(delta);
     this.movementSystem.update(delta);
     this.deathSystem.update(delta);
+    for (const ai of this.aiPlayers) {
+      ai.update({ world: this.world, mapData: this.mapData }, delta);
+    }
     this.populationSystem.update();
     this.selectionSystem.update();
     this.renderSystem.update();
