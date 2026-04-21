@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
-import { tileToScreen } from '../iso/coordinates';
+import { TILE_HEIGHT, TILE_WIDTH } from '../config/constants';
+import { tileToScreen, type TileCoord } from '../iso/coordinates';
 import { tileDepth } from '../iso/depth';
 
 export const TERRAIN_TEXTURE = 'terrain_grass';
+const HIGHLIGHT_DEPTH_OFFSET = 0.5;
 
 export interface TileMapOptions {
   readonly width: number;
@@ -19,6 +21,8 @@ export class TileMap {
 
   private readonly scene: Phaser.Scene;
   private readonly layer: Phaser.GameObjects.Layer;
+  private highlight: Phaser.GameObjects.Graphics | null = null;
+  private selection: Phaser.GameObjects.Graphics | null = null;
 
   constructor(scene: Phaser.Scene, options: TileMapOptions) {
     this.scene = scene;
@@ -26,6 +30,57 @@ export class TileMap {
     this.height = options.height;
     this.layer = scene.add.layer();
     this.build();
+  }
+
+  setHoverTile(tile: TileCoord | null): void {
+    if (!tile) {
+      this.highlight?.setVisible(false);
+      return;
+    }
+    if (!this.highlight) {
+      this.highlight = this.drawDiamondOutline(0xffe066, 0.95);
+    }
+    this.placeOverlay(this.highlight, tile);
+  }
+
+  setSelectedTile(tile: TileCoord | null): void {
+    if (!tile) {
+      this.selection?.setVisible(false);
+      return;
+    }
+    if (!this.selection) {
+      this.selection = this.drawDiamondOutline(0xffffff, 1);
+    }
+    this.placeOverlay(this.selection, tile);
+  }
+
+  private placeOverlay(
+    overlay: Phaser.GameObjects.Graphics,
+    tile: TileCoord,
+  ): void {
+    const { sx, sy } = tileToScreen(tile);
+    overlay.setPosition(sx, sy);
+    overlay.setDepth(tileDepth(tile) + HIGHLIGHT_DEPTH_OFFSET);
+    overlay.setVisible(true);
+  }
+
+  private drawDiamondOutline(
+    color: number,
+    alpha: number,
+  ): Phaser.GameObjects.Graphics {
+    const g = this.scene.add.graphics();
+    g.lineStyle(2, color, alpha);
+    const hw = TILE_WIDTH / 2;
+    const hh = TILE_HEIGHT / 2;
+    g.beginPath();
+    g.moveTo(0, -hh);
+    g.lineTo(hw, 0);
+    g.lineTo(0, hh);
+    g.lineTo(-hw, 0);
+    g.closePath();
+    g.strokePath();
+    g.setVisible(false);
+    return g;
   }
 
   private build(): void {

@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import { DEFAULT_MAP_SIZE } from '../config/constants';
+import type { TileCoord } from '../iso/coordinates';
+import { tileEquals } from '../iso/coordinates';
+import { pickTile } from '../iso/picking';
 import { hu } from '../i18n/hu';
 import { TileMap } from '../map/TileMap';
 import { CameraController } from './systems/CameraController';
@@ -7,6 +10,7 @@ import { CameraController } from './systems/CameraController';
 export class GameScene extends Phaser.Scene {
   private tileMap!: TileMap;
   private cameraController!: CameraController;
+  private hoverTile: TileCoord | null = null;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -36,7 +40,41 @@ export class GameScene extends Phaser.Scene {
     this.cameraController = new CameraController(this);
     this.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
 
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
+
     this.createOverlayText();
+  }
+
+  private onPointerMove(pointer: Phaser.Input.Pointer): void {
+    const tile = pickTile(
+      pointer.x,
+      pointer.y,
+      this.cameras.main,
+      this.tileMap.width,
+      this.tileMap.height,
+    );
+    if (tile === null && this.hoverTile !== null) {
+      this.hoverTile = null;
+      this.tileMap.setHoverTile(null);
+      return;
+    }
+    if (tile && (!this.hoverTile || !tileEquals(tile, this.hoverTile))) {
+      this.hoverTile = tile;
+      this.tileMap.setHoverTile(tile);
+    }
+  }
+
+  private onPointerDown(pointer: Phaser.Input.Pointer): void {
+    if (!pointer.leftButtonDown()) return;
+    const tile = pickTile(
+      pointer.x,
+      pointer.y,
+      this.cameras.main,
+      this.tileMap.width,
+      this.tileMap.height,
+    );
+    this.tileMap.setSelectedTile(tile);
   }
 
   private onUpdate(_time: number, delta: number): void {
