@@ -1,4 +1,8 @@
 import Phaser from 'phaser';
+import { BootScene } from '../scenes/BootScene';
+import { GameScene } from '../scenes/GameScene';
+import { MainMenuScene } from '../scenes/MainMenuScene';
+import { PreloadScene } from '../scenes/PreloadScene';
 import { GAME_HEIGHT, GAME_WIDTH } from './constants';
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {
@@ -15,5 +19,5 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     pixelArt: true,
     antialias: false,
   },
-  scene: [],
+  scene: [BootScene, PreloadScene, MainMenuScene, GameScene],
 };
