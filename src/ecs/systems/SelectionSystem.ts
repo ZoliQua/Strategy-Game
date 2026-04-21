@@ -10,6 +10,26 @@ import type { EcsWorld } from '../world';
 
 type SelectableWithPos = With<Entity, 'position' | 'selectable'>;
 
+/**
+ * Cheap stable key covering every field the HUD actually renders, so
+ * we can detect when a push to the store is worth firing.
+ */
+function infoKey(info: SelectedEntityInfo | null): string {
+  if (!info) return 'null';
+  if (info.kind === 'unit') {
+    const c = info.carrying ? `${info.carrying.type}:${info.carrying.amount}` : '-';
+    return `u:${info.id}:${info.hp.current}/${info.hp.max}:${info.tile.tx},${info.tile.ty}:${c}`;
+  }
+  if (info.kind === 'building') {
+    const q = (info.queue ?? [])
+      .map((e) => `${e.unitType}@${Math.round(e.progress * 100)}`)
+      .join(',');
+    const tr = (info.trainable ?? []).join(',');
+    return `b:${info.id}:${info.hp.current}/${info.hp.max}:${tr}:${q}`;
+  }
+  return `r:${info.id}:${info.amount}/${info.maxAmount}`;
+}
+
 function toSelectedInfo(entity: SelectableWithPos): SelectedEntityInfo | null {
   if (entity.id === undefined) return null;
   const r = (entity as Entity).resourceNode;
@@ -74,6 +94,7 @@ export class SelectionSystem {
   private readonly scene: Phaser.Scene;
   private readonly world: EcsWorld;
   private indicators: Phaser.GameObjects.Graphics[] = [];
+  private lastInfoKey: string | null = null;
 
   constructor(scene: Phaser.Scene, world: EcsWorld) {
     this.scene = scene;
@@ -181,17 +202,25 @@ export class SelectionSystem {
     const selected = this.getAllSelected();
     this.ensureIndicators(selected.length);
     if (selected.length === 0) {
-      uiStore.getState().setSelectedEntity(null);
+      if (this.lastInfoKey !== null) {
+        uiStore.getState().setSelectedEntity(null);
+        this.lastInfoKey = null;
+      }
       return;
     }
     selected.forEach((entity, i) => {
       this.drawIndicator(this.indicators[i]!, entity as SelectableWithPos);
     });
-    // Primary selection for the HUD = first (works for single-select
-    // and gives a meaningful panel for groups).
-    uiStore.getState().setSelectedEntity(
-      toSelectedInfo(selected[0] as SelectableWithPos),
-    );
+    // Primary selection for the HUD. We only push to the store when
+    // the data the HUD cares about actually changed — pushing every
+    // frame churns Zustand subscribers and triggers a full HUD render.
+    const primary = selected[0] as SelectableWithPos;
+    const info = toSelectedInfo(primary);
+    const key = infoKey(info);
+    if (key !== this.lastInfoKey) {
+      uiStore.getState().setSelectedEntity(info);
+      this.lastInfoKey = key;
+    }
   }
 
   private ensureIndicators(count: number): void {

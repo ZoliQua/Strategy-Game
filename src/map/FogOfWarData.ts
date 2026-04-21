@@ -7,12 +7,15 @@ export type FogState = 0 | 1 | 2;
 /**
  * Per-tile fog state for a single player. Uint8Array-backed so a
  * 128x128 map is 16 KB and serialises cheaply into save files.
+ *
+ * Renderers should watch `revision` and full-repaint when it bumps —
+ * we don't track per-tile dirty sets because the whole layer repaints
+ * in ~1 ms via a single Phaser Graphics batch.
  */
 export class FogOfWarData {
   public readonly width: number;
   public readonly height: number;
   private readonly states: Uint8Array;
-  public readonly dirtyTiles = new Set<number>();
   public revision = 0;
 
   constructor(width: number, height: number) {
@@ -37,22 +40,13 @@ export class FogOfWarData {
     for (let i = 0; i < this.states.length; i++) {
       if (this.states[i] === FOG_VISIBLE) {
         this.states[i] = FOG_EXPLORED;
-        this.dirtyTiles.add(i);
       }
     }
   }
 
   markVisible(tx: number, ty: number): void {
     if (tx < 0 || ty < 0 || tx >= this.width || ty >= this.height) return;
-    const idx = ty * this.width + tx;
-    if (this.states[idx] === FOG_VISIBLE) return;
-    this.states[idx] = FOG_VISIBLE;
-    this.dirtyTiles.add(idx);
-  }
-
-  clearDirty(): void {
-    this.dirtyTiles.clear();
-    this.revision++;
+    this.states[ty * this.width + tx] = FOG_VISIBLE;
   }
 
   /** Expose raw buffer for save-file serialisation. */
