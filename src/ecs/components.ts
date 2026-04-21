@@ -61,5 +61,12 @@ export interface Entity {
     type: BuildingType;
     footprint: { width: number; height: number };
   };
+  underConstruction?: {
+    /** Seconds of builder-effort required in total. */
+    totalTime: number;
+    /** Elapsed builder-effort so far. One builder adds 1s/s. */
+    elapsed: number;
+  };
+  buildCommand?: { targetId: number };
   owner?: { playerId: number };
 }

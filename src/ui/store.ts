@@ -32,6 +32,7 @@ export interface UiState {
   population: Population;
   currentAge: AgeId;
   selectedEntity: SelectedEntityInfo | null;
+  placementBuilding: BuildingType | null;
 }
 
 export interface UiActions {
@@ -39,6 +40,7 @@ export interface UiActions {
   setPopulation: (p: Partial<Population>) => void;
   setAge: (age: AgeId) => void;
   setSelectedEntity: (info: SelectedEntityInfo | null) => void;
+  setPlacementBuilding: (type: BuildingType | null) => void;
 }
 
 export type UiStore = UiState & UiActions;
@@ -48,6 +50,7 @@ const INITIAL: UiState = {
   population: { current: 3, cap: 10 },
   currentAge: 1,
   selectedEntity: null,
+  placementBuilding: null,
 };
 
 export function createUiStore(): StoreApi<UiStore> {
@@ -59,8 +62,21 @@ export function createUiStore(): StoreApi<UiStore> {
       set((state) => ({ population: { ...state.population, ...p } })),
     setAge: (age) => set({ currentAge: age }),
     setSelectedEntity: (info) => set({ selectedEntity: info }),
+    setPlacementBuilding: (type) => set({ placementBuilding: type }),
   }));
 }
 
-/** Default singleton store used by GameScene and HUDScene. */
-export const uiStore = createUiStore();
+/**
+ * Default singleton store used by GameScene and HUDScene. Pinned on
+ * globalThis so Vite HMR re-evaluations share a single instance
+ * across both the game bundle and dynamic `import()` calls (this is
+ * a dev-only quality-of-life; in the production bundle the module
+ * is evaluated once anyway).
+ */
+const STORE_KEY = '__isorts_uiStore__';
+interface GlobalHolder {
+  [STORE_KEY]?: StoreApi<UiStore>;
+}
+const holder = globalThis as unknown as GlobalHolder;
+export const uiStore: StoreApi<UiStore> = holder[STORE_KEY] ?? createUiStore();
+holder[STORE_KEY] = uiStore;

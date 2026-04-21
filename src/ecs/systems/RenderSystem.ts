@@ -39,6 +39,7 @@ export class RenderSystem {
       sprite.setPosition(sx, sy);
       sprite.setDepth(renderDepth(entity));
       applyFacing(sprite, entity);
+      applyConstructionAlpha(sprite, entity);
     }
   }
 
@@ -78,6 +79,22 @@ function renderScreenPos(entity: Renderable): { sx: number; sy: number } {
     sx: from.sx + (to.sx - from.sx) * t,
     sy: from.sy + (to.sy - from.sy) * t,
   };
+}
+
+function applyConstructionAlpha(
+  sprite: Phaser.GameObjects.Sprite,
+  entity: Renderable,
+): void {
+  if (entity.underConstruction) {
+    const t = Math.min(
+      1,
+      entity.underConstruction.elapsed /
+        entity.underConstruction.totalTime,
+    );
+    sprite.setAlpha(0.3 + 0.6 * t);
+  } else if (entity.building) {
+    sprite.setAlpha(1);
+  }
 }
 
 function applyFacing(
