@@ -11,8 +11,11 @@ import {
 } from '../ecs/archetypes/resource';
 import { createVillager } from '../ecs/archetypes/villager';
 import { queueUnit } from '../ecs/queueUnit';
+import { CombatSystem } from '../ecs/systems/CombatSystem';
 import { ConstructionSystem } from '../ecs/systems/ConstructionSystem';
+import { DeathSystem } from '../ecs/systems/DeathSystem';
 import { GatheringSystem } from '../ecs/systems/GatheringSystem';
+import { HealthBarSystem } from '../ecs/systems/HealthBarSystem';
 import { MovementSystem } from '../ecs/systems/MovementSystem';
 import { PopulationSystem } from '../ecs/systems/PopulationSystem';
 import { TrainingSystem } from '../ecs/systems/TrainingSystem';
@@ -42,6 +45,9 @@ export class GameScene extends Phaser.Scene {
   private constructionSystem!: ConstructionSystem;
   private trainingSystem!: TrainingSystem;
   private populationSystem!: PopulationSystem;
+  private combatSystem!: CombatSystem;
+  private deathSystem!: DeathSystem;
+  private healthBarSystem!: HealthBarSystem;
   private players!: PlayerManager;
   private commandUnsubscribe: (() => void) | null = null;
   private buildGhost: Phaser.GameObjects.Image | null = null;
@@ -94,6 +100,9 @@ export class GameScene extends Phaser.Scene {
     this.constructionSystem = new ConstructionSystem(this.world, this.mapData);
     this.trainingSystem = new TrainingSystem(this.world, this.mapData);
     this.populationSystem = new PopulationSystem(this.world, 1);
+    this.combatSystem = new CombatSystem(this.world, this.mapData);
+    this.deathSystem = new DeathSystem(this.world, this.mapData);
+    this.healthBarSystem = new HealthBarSystem(this, this.world);
 
     this.commandUnsubscribe = onCommand((cmd) => {
       if (cmd.type === 'queue-unit') {
@@ -214,6 +223,13 @@ export class GameScene extends Phaser.Scene {
     } else if (pointer.rightButtonDown() && tile) {
       const selected = this.selectionSystem.getSelected();
       if (!selected) return;
+      const enemy = this.findEnemyAt(tile.tx, tile.ty, selected);
+      if (enemy && selected.attacker) {
+        this.world.addComponent(selected, 'attackIntent', {
+          targetId: enemy.id ?? 0,
+        });
+        return;
+      }
       const node = this.findResourceNodeAt(tile.tx, tile.ty);
       if (node && selected.gatherer) {
         this.world.addComponent(selected, 'gatherIntent', {
@@ -223,6 +239,33 @@ export class GameScene extends Phaser.Scene {
         this.world.addComponent(selected, 'moveIntent', { target: tile });
       }
     }
+  }
+
+  private findEnemyAt(
+    tx: number,
+    ty: number,
+    actor: import('../ecs/components').Entity,
+  ): import('../ecs/components').Entity | null {
+    const actorPlayer = actor.owner?.playerId;
+    if (actorPlayer === undefined) return null;
+    const candidates = this.world.with('position', 'owner', 'health');
+    for (const c of candidates) {
+      if (c.owner.playerId === actorPlayer) continue;
+      const b = (c as import('../ecs/components').Entity).building;
+      if (b) {
+        if (
+          tx >= c.position.tx &&
+          tx < c.position.tx + b.footprint.width &&
+          ty >= c.position.ty &&
+          ty < c.position.ty + b.footprint.height
+        ) {
+          return c;
+        }
+        continue;
+      }
+      if (c.position.tx === tx && c.position.ty === ty) return c;
+    }
+    return null;
   }
 
   private tryPlaceBuilding(
@@ -287,10 +330,13 @@ export class GameScene extends Phaser.Scene {
     this.gatheringSystem.update(delta);
     this.constructionSystem.update(delta);
     this.trainingSystem.update(delta);
+    this.combatSystem.update(delta);
     this.movementSystem.update(delta);
+    this.deathSystem.update(delta);
     this.populationSystem.update();
     this.selectionSystem.update();
     this.renderSystem.update();
+    this.healthBarSystem.update();
     this.updateBuildGhost();
   }
 

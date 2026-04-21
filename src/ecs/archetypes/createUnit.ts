@@ -40,6 +40,14 @@ export function createUnit(
       dropoffId: undefined,
     };
   }
+  if (spec.damage > 0) {
+    entity.attacker = {
+      damage: spec.damage,
+      range: spec.range,
+      cooldownMs: 1500,
+      cooldownRemaining: 0,
+    };
+  }
   world.add(entity);
   return entity;
 }

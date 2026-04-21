@@ -79,4 +79,15 @@ export interface Entity {
   };
   owner?: { playerId: number };
   populationCost?: { amount: number };
+  attacker?: {
+    damage: number;
+    /** Tile range: 1 = melee, higher for ranged. */
+    range: number;
+    /** Milliseconds between attacks. */
+    cooldownMs: number;
+    /** Remaining cooldown (ms). 0 = ready to swing. */
+    cooldownRemaining: number;
+  };
+  attackIntent?: { targetId: number };
+  dying?: { ttlMs: number };
 }

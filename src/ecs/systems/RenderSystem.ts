@@ -40,6 +40,8 @@ export class RenderSystem {
       sprite.setDepth(renderDepth(entity));
       applyFacing(sprite, entity);
       applyConstructionAlpha(sprite, entity);
+      applyOwnerTint(sprite, entity);
+      applyDyingAlpha(sprite, entity);
     }
   }
 
@@ -79,6 +81,34 @@ function renderScreenPos(entity: Renderable): { sx: number; sy: number } {
     sx: from.sx + (to.sx - from.sx) * t,
     sy: from.sy + (to.sy - from.sy) * t,
   };
+}
+
+const OWNER_TINTS: Record<number, number> = {
+  1: 0xffffff, // human = natural color
+  2: 0xffb0b0, // red
+  3: 0xb0ffb0, // green
+  4: 0xfff0b0, // yellow
+  5: 0xd0b0ff, // purple
+  6: 0xb0f0ff, // cyan
+};
+
+function applyOwnerTint(
+  sprite: Phaser.GameObjects.Sprite,
+  entity: Renderable,
+): void {
+  if (!entity.owner) return;
+  sprite.setTint(OWNER_TINTS[entity.owner.playerId] ?? 0xffffff);
+}
+
+function applyDyingAlpha(
+  sprite: Phaser.GameObjects.Sprite,
+  entity: Renderable,
+): void {
+  const d = (entity as { dying?: { ttlMs: number } }).dying;
+  if (!d) return;
+  // Fade out over the dying window (assumed max ~900ms).
+  const alpha = Math.max(0, d.ttlMs / 900);
+  sprite.setAlpha(alpha);
 }
 
 function applyConstructionAlpha(
