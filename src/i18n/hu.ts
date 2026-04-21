@@ -52,6 +52,15 @@ export const hu = {
     noSelection: 'Nincs kijelölés',
     hp: 'HP',
   },
+  gameOver: {
+    victoryTitle: 'Győzelem!',
+    defeatTitle: 'Vereség',
+    victoryBody: 'Az ellenfél városházája elpusztult. A föld a tiéd.',
+    defeatBody: 'Az ellenfél legyőzött téged. Még egy menet?',
+    backToMenu: 'Vissza a főmenübe',
+    statsHeader: 'Statisztika',
+    durationLabel: 'Játékidő',
+  },
   loading: 'Betöltés…',
 } as const;
 

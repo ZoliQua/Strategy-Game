@@ -4,6 +4,7 @@ import {
   createDefaultPlayers,
   PlayerManager,
 } from '../game/PlayerManager';
+import { VictoryChecker } from '../game/VictoryChecker';
 import { AIPlayer } from '../ai/AIPlayer';
 import { EasyStrategy } from '../ai/strategies/EasyStrategy';
 import { BUILDING_SPECS, createBuilding } from '../ecs/archetypes/building';
@@ -52,6 +53,9 @@ export class GameScene extends Phaser.Scene {
   private healthBarSystem!: HealthBarSystem;
   private players!: PlayerManager;
   private aiPlayers: AIPlayer[] = [];
+  private victoryChecker!: VictoryChecker;
+  private gameElapsedMs = 0;
+  private gameOverTriggered = false;
   private commandUnsubscribe: (() => void) | null = null;
   private buildGhost: Phaser.GameObjects.Image | null = null;
   private mapData!: import('../map/MapData').MapData;
@@ -151,6 +155,9 @@ export class GameScene extends Phaser.Scene {
     this.aiPlayers = this.players
       .ais()
       .map((p) => new AIPlayer(p, new EasyStrategy()));
+    this.victoryChecker = new VictoryChecker(this.world, this.players);
+    this.gameElapsedMs = 0;
+    this.gameOverTriggered = false;
 
     if (!this.scene.isActive('HUDScene')) {
       this.scene.launch('HUDScene');
@@ -347,6 +354,23 @@ export class GameScene extends Phaser.Scene {
     this.renderSystem.update();
     this.healthBarSystem.update();
     this.updateBuildGhost();
+
+    this.gameElapsedMs += delta;
+    this.checkVictory();
+  }
+
+  private checkVictory(): void {
+    if (this.gameOverTriggered) return;
+    const state = this.victoryChecker.check();
+    if (state.kind === 'playing') return;
+    this.gameOverTriggered = true;
+    const data = {
+      victory: state.kind === 'victory',
+      durationMs: this.gameElapsedMs,
+    };
+    this.scene.launch('GameOverScene', data);
+    this.scene.bringToTop('GameOverScene');
+    this.scene.pause();
   }
 
   private updateBuildGhost(): void {

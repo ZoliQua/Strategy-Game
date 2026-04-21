@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BootScene } from '../scenes/BootScene';
+import { GameOverScene } from '../scenes/GameOverScene';
 import { GameScene } from '../scenes/GameScene';
 import { HUDScene } from '../scenes/HUDScene';
 import { MainMenuScene } from '../scenes/MainMenuScene';
@@ -25,5 +26,12 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     forceSetTimeOut: true,
   },
   autoFocus: false,
-  scene: [BootScene, PreloadScene, MainMenuScene, GameScene, HUDScene],
+  scene: [
+    BootScene,
+    PreloadScene,
+    MainMenuScene,
+    GameScene,
+    HUDScene,
+    GameOverScene,
+  ],
 };
